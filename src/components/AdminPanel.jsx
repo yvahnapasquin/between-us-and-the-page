@@ -17,6 +17,7 @@ export default function AdminPanel({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [adminToRemove, setAdminToRemove] = useState(null);
 
 
   /* =========================================================
@@ -141,12 +142,17 @@ export default function AdminPanel({
 
   async function handleRemoveAdmin(admin) {
 
-    const confirmed =
-      window.confirm(
-        `Remove ${admin.email} from admins?`
-      );
+    setAdminToRemove(admin);
 
-    if (!confirmed) return;
+  }
+
+
+  async function confirmRemoveAdmin() {
+
+    if (!adminToRemove) return;
+
+    const admin = adminToRemove;
+    setAdminToRemove(null);
 
     try {
 
@@ -554,6 +560,94 @@ export default function AdminPanel({
         </div>
 
       </section>
+
+      {adminToRemove && (
+        <div
+          className="
+            fixed
+            inset-0
+            z-[10002]
+            flex
+            items-center
+            justify-center
+            bg-ink/30
+            px-4
+            backdrop-blur-sm
+          "
+          onClick={() => setAdminToRemove(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="remove-admin-title"
+            className="
+              w-full
+              max-w-md
+              rounded-2xl
+              border
+              border-ink/10
+              bg-paper
+              p-6
+              shadow-xl
+            "
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2
+              id="remove-admin-title"
+              className="font-display text-xl text-ink"
+            >
+              Remove admin?
+            </h2>
+
+            <p className="mt-2 font-body text-sm leading-6 text-ink-soft">
+              Remove {adminToRemove.email} from admins?
+            </p>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setAdminToRemove(null)}
+                className="
+                  rounded-lg
+                  border
+                  border-ink/15
+                  px-4
+                  py-2.5
+                  font-mono
+                  text-xs
+                  uppercase
+                  tracking-wide
+                  text-ink-soft
+                  transition
+                  hover:bg-ink/5
+                "
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmRemoveAdmin}
+                className="
+                  rounded-lg
+                  bg-ink
+                  px-4
+                  py-2.5
+                  font-mono
+                  text-xs
+                  uppercase
+                  tracking-wide
+                  text-paper
+                  transition
+                  hover:opacity-90
+                "
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

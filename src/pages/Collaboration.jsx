@@ -26,6 +26,7 @@ export default function Collaboration() {
   const [spaceLoading, setSpaceLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [confirmation, setConfirmation] = useState(null);
 
   const [showCreateSpace, setShowCreateSpace] = useState(false);
   const [showCreateBook, setShowCreateBook] = useState(false);
@@ -221,9 +222,17 @@ export default function Collaboration() {
   async function handleRemoveBook(journalId) {
     if (!selectedSpaceId) return;
 
-    if (!window.confirm('Remove this book from the shared library?')) {
-      return;
-    }
+    setConfirmation({
+      type: 'book',
+      journalId,
+    });
+  }
+
+  async function confirmRemoveBook() {
+    if (!selectedSpaceId || !confirmation?.journalId) return;
+
+    const journalId = confirmation.journalId;
+    setConfirmation(null);
 
     try {
       setSaving(true);
@@ -249,9 +258,17 @@ export default function Collaboration() {
       return;
     }
 
-    if (!window.confirm('Remove this member from the shared space?')) {
-      return;
-    }
+    setConfirmation({
+      type: 'member',
+      memberId,
+    });
+  }
+
+  async function confirmRemoveMember() {
+    if (!selectedSpaceId || !confirmation?.memberId) return;
+
+    const memberId = confirmation.memberId;
+    setConfirmation(null);
 
     try {
       setSaving(true);
@@ -271,6 +288,7 @@ export default function Collaboration() {
       setSaving(false);
     }
   }
+
 
   if (loading) {
     return <Loading label="Opening collaboration" />;
@@ -679,6 +697,59 @@ export default function Collaboration() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {confirmation && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-ink/30 px-4 backdrop-blur-sm"
+          onClick={() => setConfirmation(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="collaboration-confirmation-title"
+            className="w-full max-w-md rounded-2xl border border-ink/10 bg-paper p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="collaboration-confirmation-title"
+              className="font-display text-2xl italic"
+            >
+              {confirmation.type === 'book'
+                ? 'Remove this book?'
+                : 'Remove this member?'}
+            </h2>
+
+            <p className="mt-2 font-body text-sm leading-6 text-ink-soft">
+              {confirmation.type === 'book'
+                ? 'Remove this book from the shared library?'
+                : 'Remove this member from the shared space?'}
+            </p>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmation(null)}
+                className="rounded-lg border border-ink/15 px-4 py-2.5 font-mono text-[10px] uppercase tracking-wide text-ink-soft"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={
+                  confirmation.type === 'book'
+                    ? confirmRemoveBook
+                    : confirmRemoveMember
+                }
+                disabled={saving}
+                className="rounded-lg bg-ink px-4 py-2.5 font-mono text-[10px] uppercase tracking-wide text-paper disabled:opacity-40"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
