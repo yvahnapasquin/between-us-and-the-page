@@ -753,6 +753,64 @@ export default function Journal() {
     poems ?? [];
 
 
+  /* =======================================================
+     RECENTLY OPENED JOURNALS
+  ======================================================= */
+
+  useEffect(() => {
+
+    if (
+      isPublicView ||
+      !user?.id ||
+      !journal?.id
+    ) {
+      return;
+    }
+
+    if (journal.owner_id !== user.id) {
+      return;
+    }
+
+    const storageKey =
+      `between-us-recently-opened-${user.id}`;
+
+    try {
+      const stored =
+        JSON.parse(
+          localStorage.getItem(storageKey) ||
+            '[]'
+        );
+
+      const current =
+        Array.isArray(stored)
+          ? stored
+          : [];
+
+      const next = [
+        {
+          id: journal.id,
+          openedAt: Date.now(),
+        },
+        ...current.filter(
+          (item) => item?.id !== journal.id
+        ),
+      ].slice(0, 5);
+
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify(next)
+      );
+    } catch (error) {
+      console.error(error);
+    }
+
+  }, [
+    journal,
+    user,
+    isPublicView,
+  ]);
+
+
   const isOwner =
     !isPublicView &&
     journal &&

@@ -401,6 +401,54 @@ export default function Dashboard() {
 
 
   const [
+    recentlyOpenedJournals,
+    setRecentlyOpenedJournals,
+  ] = useState([]);
+
+
+  useEffect(() => {
+
+    if (!user?.id) {
+      setRecentlyOpenedJournals([]);
+      return;
+    }
+
+    const storageKey =
+      `between-us-recently-opened-${user.id}`;
+
+    try {
+      const stored =
+        JSON.parse(
+          window.localStorage.getItem(storageKey) || '[]'
+        );
+
+      const recentIds =
+        Array.isArray(stored)
+          ? stored
+              .filter((item) => item?.id)
+              .sort((a, b) => (b?.openedAt || 0) - (a?.openedAt || 0))
+              .map((item) => item.id)
+              .slice(0, 5)
+          : [];
+
+      const journalMap = new Map(
+        (journals ?? []).map((journal) => [journal.id, journal])
+      );
+
+      setRecentlyOpenedJournals(
+        recentIds
+          .map((id) => journalMap.get(id))
+          .filter(Boolean)
+      );
+    } catch (error) {
+      console.error(error);
+      setRecentlyOpenedJournals([]);
+    }
+
+  }, [user?.id, journals]);
+
+
+  const [
     title,
     setTitle,
   ] = useState('');
@@ -1530,6 +1578,38 @@ export default function Dashboard() {
         </form>
 
       )}
+
+
+      {
+        !journalSearch.trim() &&
+        (!isAdmin || adminLibraryView === 'library') &&
+        recentlyOpenedJournals.length > 0 && (
+          <section className="mb-10 sm:mb-12">
+
+            <div className="mb-3 flex items-center justify-between gap-2 sm:mb-4">
+              <div className="flex items-center gap-2">
+                <h2 className="font-mono text-xs uppercase tracking-wide text-ink-soft">
+                  Recently opened
+                </h2>
+
+                <span className="font-mono text-[10px] uppercase tracking-wide text-ink-soft/70">
+                  · {recentlyOpenedJournals.length}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
+              {recentlyOpenedJournals.map((journal) => (
+                <JournalCard
+                  key={`recent-${journal.id}`}
+                  journal={journal}
+                />
+              ))}
+            </div>
+
+          </section>
+        )
+      }
 
 
       {/* =====================================================
