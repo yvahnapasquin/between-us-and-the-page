@@ -11,6 +11,7 @@ import {
   getCollaborationBooks,
   getCollaborationMembers,
   getMyCollaborationSpaces,
+  leaveCollaborationSpace,
   removeCollaborationBook,
   removeCollaborationMember,
 } from '../services/collaborationService';
@@ -336,6 +337,52 @@ export default function Collaboration() {
     }
   }
 
+  function handleLeaveSpace() {
+    if (!selectedSpaceId || isOwner) return;
+
+    setConfirmation({
+      type: 'leave',
+      spaceId: selectedSpaceId,
+    });
+  }
+
+  async function confirmLeaveSpace() {
+    if (
+      !selectedSpaceId ||
+      isOwner ||
+      confirmation?.type !== 'leave'
+    ) {
+      return;
+    }
+
+    const spaceIdToLeave = confirmation.spaceId;
+    setConfirmation(null);
+
+    try {
+      setSaving(true);
+      setError('');
+
+      await leaveCollaborationSpace(spaceIdToLeave);
+
+      setSpaces((current) =>
+        current.filter((space) => space.id !== spaceIdToLeave)
+      );
+
+      setSelectedSpaceId(null);
+      setMembers([]);
+      setBooks([]);
+      setShowMembers(false);
+      setNotice('You left the shared space.');
+
+      navigate('/collaboration');
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || 'Could not leave the shared space.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return <Loading label="Opening collaboration" />;
   }
@@ -483,7 +530,7 @@ export default function Collaboration() {
                     + Create book
                   </button>
 
-                  {isOwner && (
+                  {isOwner ? (
                     <button
                       type="button"
                       onClick={handleDeleteSpace}
@@ -491,6 +538,15 @@ export default function Collaboration() {
                       className="rounded-lg border border-ink/15 px-3 py-2 font-mono text-[10px] uppercase tracking-wide text-ink-soft hover:bg-ink/5 disabled:opacity-40"
                     >
                       Delete space
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleLeaveSpace}
+                      disabled={saving}
+                      className="rounded-lg border border-ink/15 px-3 py-2 font-mono text-[10px] uppercase tracking-wide text-ink-soft hover:bg-ink/5 disabled:opacity-40"
+                    >
+                      Leave space
                     </button>
                   )}
                 </div>
@@ -775,17 +831,21 @@ export default function Collaboration() {
             >
               {confirmation.type === 'space'
                 ? 'Delete this space?'
-                : confirmation.type === 'book'
-                  ? 'Remove this book?'
-                  : 'Remove this member?'}
+                : confirmation.type === 'leave'
+                  ? 'Leave this space?'
+                  : confirmation.type === 'book'
+                    ? 'Remove this book?'
+                    : 'Remove this member?'}
             </h2>
 
             <p className="mt-2 font-body text-sm leading-6 text-ink-soft">
               {confirmation.type === 'space'
                 ? 'Delete this shared space? This will remove it from your collaboration spaces.'
-                : confirmation.type === 'book'
-                  ? 'Remove this book from the shared library?'
-                  : 'Remove this member from the shared space?'}
+                : confirmation.type === 'leave'
+                  ? 'Leave this shared space? You will no longer have access to it.'
+                  : confirmation.type === 'book'
+                    ? 'Remove this book from the shared library?'
+                    : 'Remove this member from the shared space?'}
             </p>
 
             <div className="mt-5 flex justify-end gap-2">
@@ -802,14 +862,20 @@ export default function Collaboration() {
                 onClick={
                   confirmation.type === 'space'
                     ? confirmDeleteSpace
-                    : confirmation.type === 'book'
-                      ? confirmRemoveBook
-                      : confirmRemoveMember
+                    : confirmation.type === 'leave'
+                      ? confirmLeaveSpace
+                      : confirmation.type === 'book'
+                        ? confirmRemoveBook
+                        : confirmRemoveMember
                 }
                 disabled={saving}
                 className="rounded-lg bg-ink px-4 py-2.5 font-mono text-[10px] uppercase tracking-wide text-paper disabled:opacity-40"
               >
-                {confirmation.type === 'space' ? 'Delete' : 'Remove'}
+                {confirmation.type === 'space'
+                  ? 'Delete'
+                  : confirmation.type === 'leave'
+                    ? 'Leave'
+                    : 'Remove'}
               </button>
             </div>
           </div>
