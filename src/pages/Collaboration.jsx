@@ -7,6 +7,7 @@ import {
   addCollaborationMember,
   createCollaborationBook,
   createCollaborationSpace,
+  deleteCollaborationSpace,
   getCollaborationBooks,
   getCollaborationMembers,
   getMyCollaborationSpaces,
@@ -289,6 +290,51 @@ export default function Collaboration() {
     }
   }
 
+  function handleDeleteSpace() {
+    if (!selectedSpaceId || !isOwner) return;
+
+    setConfirmation({
+      type: 'space',
+      spaceId: selectedSpaceId,
+    });
+  }
+
+  async function confirmDeleteSpace() {
+    if (
+      !selectedSpaceId ||
+      !isOwner ||
+      confirmation?.type !== 'space'
+    ) {
+      return;
+    }
+
+    const spaceIdToDelete = confirmation.spaceId;
+    setConfirmation(null);
+
+    try {
+      setSaving(true);
+      setError('');
+
+      await deleteCollaborationSpace(spaceIdToDelete);
+
+      setSpaces((current) =>
+        current.filter((space) => space.id !== spaceIdToDelete)
+      );
+
+      setSelectedSpaceId(null);
+      setMembers([]);
+      setBooks([]);
+      setShowMembers(false);
+      setNotice('Shared space deleted.');
+
+      navigate('/collaboration');
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || 'Could not delete the shared space.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (loading) {
     return <Loading label="Opening collaboration" />;
@@ -436,6 +482,17 @@ export default function Collaboration() {
                   >
                     + Create book
                   </button>
+
+                  {isOwner && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteSpace}
+                      disabled={saving}
+                      className="rounded-lg border border-ink/15 px-3 py-2 font-mono text-[10px] uppercase tracking-wide text-ink-soft hover:bg-ink/5 disabled:opacity-40"
+                    >
+                      Delete space
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -716,15 +773,19 @@ export default function Collaboration() {
               id="collaboration-confirmation-title"
               className="font-display text-2xl italic"
             >
-              {confirmation.type === 'book'
-                ? 'Remove this book?'
-                : 'Remove this member?'}
+              {confirmation.type === 'space'
+                ? 'Delete this space?'
+                : confirmation.type === 'book'
+                  ? 'Remove this book?'
+                  : 'Remove this member?'}
             </h2>
 
             <p className="mt-2 font-body text-sm leading-6 text-ink-soft">
-              {confirmation.type === 'book'
-                ? 'Remove this book from the shared library?'
-                : 'Remove this member from the shared space?'}
+              {confirmation.type === 'space'
+                ? 'Delete this shared space? This will remove it from your collaboration spaces.'
+                : confirmation.type === 'book'
+                  ? 'Remove this book from the shared library?'
+                  : 'Remove this member from the shared space?'}
             </p>
 
             <div className="mt-5 flex justify-end gap-2">
@@ -739,14 +800,16 @@ export default function Collaboration() {
               <button
                 type="button"
                 onClick={
-                  confirmation.type === 'book'
-                    ? confirmRemoveBook
-                    : confirmRemoveMember
+                  confirmation.type === 'space'
+                    ? confirmDeleteSpace
+                    : confirmation.type === 'book'
+                      ? confirmRemoveBook
+                      : confirmRemoveMember
                 }
                 disabled={saving}
                 className="rounded-lg bg-ink px-4 py-2.5 font-mono text-[10px] uppercase tracking-wide text-paper disabled:opacity-40"
               >
-                Remove
+                {confirmation.type === 'space' ? 'Delete' : 'Remove'}
               </button>
             </div>
           </div>

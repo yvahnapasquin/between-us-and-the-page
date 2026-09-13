@@ -83,6 +83,32 @@ export async function createCollaborationSpace(
 
 
 /* =========================================================
+   DELETE COLLABORATION SPACE
+========================================================= */
+
+export async function deleteCollaborationSpace(
+  spaceId
+) {
+
+  const {
+    data,
+    error,
+  } = await supabase
+    .from('collaboration_spaces')
+    .delete()
+    .eq('id', spaceId);
+
+
+  if (error) {
+    throw error;
+  }
+
+
+  return data;
+}
+
+
+/* =========================================================
    GET MEMBERS
 ========================================================= */
 
