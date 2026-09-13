@@ -16,6 +16,7 @@ import CollaborativeShareLanding from './pages/CollaborativeShareLanding';
 import BookcasePage from './pages/BookcasePage';
 import Chat from './pages/Chat';
 import Collaboration from './pages/Collaboration';
+import NotFound from './pages/NotFound';
 
 
 export default function App() {
@@ -195,6 +196,18 @@ export default function App() {
               path="/shared/:shareToken/book"
               element={
                 <Journal />
+              }
+            />
+
+
+            {/* =================================================
+                404
+            ================================================= */}
+
+            <Route
+              path="*"
+              element={
+                <NotFound />
               }
             />
 
