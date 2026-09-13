@@ -109,6 +109,11 @@ export default function Dashboard() {
     setDeletingSelectedBooks,
   ] = useState(false);
 
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState('');
+
   const bookcaseStorageKey =
     user?.id
       ? `between-us-bookcases-${user.id}`
@@ -329,7 +334,7 @@ export default function Dashboard() {
 
       console.error(error);
 
-      window.alert(
+      setErrorMessage(
         error?.message ||
         'Could not delete the selected books. Please try again.'
       );
@@ -398,54 +403,6 @@ export default function Dashboard() {
     adminLibraryView,
     setAdminLibraryView,
   ] = useState('library');
-
-
-  const [
-    recentlyOpenedJournals,
-    setRecentlyOpenedJournals,
-  ] = useState([]);
-
-
-  useEffect(() => {
-
-    if (!user?.id) {
-      setRecentlyOpenedJournals([]);
-      return;
-    }
-
-    const storageKey =
-      `between-us-recently-opened-${user.id}`;
-
-    try {
-      const stored =
-        JSON.parse(
-          window.localStorage.getItem(storageKey) || '[]'
-        );
-
-      const recentIds =
-        Array.isArray(stored)
-          ? stored
-              .filter((item) => item?.id)
-              .sort((a, b) => (b?.openedAt || 0) - (a?.openedAt || 0))
-              .map((item) => item.id)
-              .slice(0, 5)
-          : [];
-
-      const journalMap = new Map(
-        (journals ?? []).map((journal) => [journal.id, journal])
-      );
-
-      setRecentlyOpenedJournals(
-        recentIds
-          .map((id) => journalMap.get(id))
-          .filter(Boolean)
-      );
-    } catch (error) {
-      console.error(error);
-      setRecentlyOpenedJournals([]);
-    }
-
-  }, [user?.id, journals]);
 
 
   const [
@@ -1033,7 +990,7 @@ export default function Dashboard() {
         'Could not create the journal. Please try again.';
 
 
-      window.alert(
+      setErrorMessage(
         `Could not create the journal.\n\n${errorMessage}`
       );
 
@@ -1086,7 +1043,7 @@ export default function Dashboard() {
 
       console.error(error);
 
-      window.alert(
+      setErrorMessage(
         error?.message ||
         'Could not remove the shared journal. Please try again.'
       );
@@ -1578,38 +1535,6 @@ export default function Dashboard() {
         </form>
 
       )}
-
-
-      {
-        !journalSearch.trim() &&
-        (!isAdmin || adminLibraryView === 'library') &&
-        recentlyOpenedJournals.length > 0 && (
-          <section className="mb-10 sm:mb-12">
-
-            <div className="mb-3 flex items-center justify-between gap-2 sm:mb-4">
-              <div className="flex items-center gap-2">
-                <h2 className="font-mono text-xs uppercase tracking-wide text-ink-soft">
-                  Recently opened
-                </h2>
-
-                <span className="font-mono text-[10px] uppercase tracking-wide text-ink-soft/70">
-                  · {recentlyOpenedJournals.length}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
-              {recentlyOpenedJournals.map((journal) => (
-                <JournalCard
-                  key={`recent-${journal.id}`}
-                  journal={journal}
-                />
-              ))}
-            </div>
-
-          </section>
-        )
-      }
 
 
       {/* =====================================================
@@ -3001,6 +2926,145 @@ export default function Dashboard() {
 
       )}
 
+
+      {errorMessage && (
+
+        <div
+          className="
+            fixed
+            inset-0
+            z-50
+            flex
+            items-center
+            justify-center
+            bg-ink/30
+            px-4
+            backdrop-blur-sm
+          "
+          onClick={() => setErrorMessage('')}
+        >
+
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dashboard-error-title"
+            className="
+              w-full
+              max-w-md
+              rounded-2xl
+              border
+              border-ink/10
+              bg-paper
+              p-6
+              shadow-xl
+            "
+            onClick={(e) =>
+              e.stopPropagation()
+            }
+          >
+
+            <div
+              className="
+                mb-5
+                flex
+                items-start
+                justify-between
+                gap-4
+              "
+            >
+
+              <div>
+
+                <h2
+                  id="dashboard-error-title"
+                  className="
+                    font-display
+                    text-xl
+                    text-ink
+                  "
+                >
+                  Something went wrong
+                </h2>
+
+                <p
+                  className="
+                    mt-2
+                    whitespace-pre-line
+                    font-body
+                    text-sm
+                    leading-6
+                    text-ink-soft
+                  "
+                >
+                  {errorMessage}
+                </p>
+
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setErrorMessage('')}
+                className="
+                  flex
+                  h-8
+                  w-8
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-full
+                  text-ink-soft
+                  transition
+                  hover:bg-ink/5
+                  hover:text-ink
+                "
+                aria-label="Close"
+              >
+
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                >
+                  <path d="M6 6l12 12" />
+                  <path d="M18 6L6 18" />
+                </svg>
+
+              </button>
+
+            </div>
+
+            <div className="flex justify-end">
+
+              <button
+                type="button"
+                onClick={() => setErrorMessage('')}
+                className="
+                  rounded-lg
+                  bg-ink
+                  px-4
+                  py-2.5
+                  font-mono
+                  text-xs
+                  uppercase
+                  tracking-wide
+                  text-paper
+                  transition
+                  hover:opacity-90
+                "
+              >
+                Okay
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
 
       {/* =====================================================
           REMOVE SHARED JOURNAL CONFIRMATION POPUP
