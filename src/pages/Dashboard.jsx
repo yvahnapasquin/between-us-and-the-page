@@ -6,6 +6,7 @@ import {
   getSharedJournals,
   uploadJournalCover,
   updateJournalCoverImages,
+  getSafeCreateJournalErrorMessage,
 } from '../services/journalService';
 import { useAsync } from '../hooks/useAsync';
 import { supabase } from '../services/supabase';

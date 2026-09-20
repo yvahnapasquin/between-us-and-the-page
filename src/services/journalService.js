@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { registerPublicJournalViewer } from './shareService';
+import { checkIsAdmin } from './adminService';
 
 
 /* =========================================================
@@ -40,6 +41,7 @@ export async function getMyJournals() {
 
   return data ?? [];
 }
+
 
 /* =========================================================
    GET SAMPLE JOURNALS
@@ -106,6 +108,7 @@ export async function getSharedJournals() {
   return Array.isArray(data) ? data : [];
 }
 
+
 /* =========================================================
    GET ONE JOURNAL
 ========================================================= */
@@ -160,6 +163,186 @@ export async function createJournal({
   }
 
 
+  /*
+    A journal must always have an authenticated owner.
+    The owner ID comes from Supabase auth, not from form input.
+  */
+
+  if (!userData?.user?.id) {
+    throw new Error(
+      'You must be signed in to create a journal.'
+    );
+  }
+
+
+  /* =======================================================
+     CLEAN INPUT VALUES
+  ======================================================= */
+
+  const cleanTitle =
+    typeof title === 'string'
+      ? title.trim()
+      : '';
+
+
+  const cleanDescription =
+    typeof description === 'string'
+      ? description.trim()
+      : '';
+
+
+  const cleanAuthorName =
+    typeof authorName === 'string'
+      ? authorName.trim()
+      : '';
+
+
+  const cleanJournalDate =
+    typeof journalDate === 'string'
+      ? journalDate.trim()
+      : '';
+
+
+  const cleanCoverColor =
+    typeof coverColor === 'string'
+      ? coverColor.trim().toLowerCase()
+      : '#c9a876';
+
+
+  const cleanSpineColor =
+    typeof spineColor === 'string'
+      ? spineColor.trim().toLowerCase()
+      : '#8a6f47';
+
+
+  const cleanCoverMaterial =
+    typeof coverMaterial === 'string'
+      ? coverMaterial.trim()
+      : 'kraft';
+
+
+  /* =======================================================
+     INPUT VALIDATION
+  ======================================================= */
+
+  if (
+    cleanTitle.length > 200
+  ) {
+    throw new Error(
+      'Journal title must be 200 characters or fewer.'
+    );
+  }
+
+
+  if (
+    cleanDescription.length > 2000
+  ) {
+    throw new Error(
+      'Journal description must be 2,000 characters or fewer.'
+    );
+  }
+
+
+  if (
+    cleanAuthorName.length > 120
+  ) {
+    throw new Error(
+      'Author name must be 120 characters or fewer.'
+    );
+  }
+
+
+  if (
+    cleanJournalDate &&
+    !isValidJournalDate(
+      cleanJournalDate
+    )
+  ) {
+    throw new Error(
+      'Please enter a valid journal date.'
+    );
+  }
+
+
+  if (
+    !isValidHexColor(
+      cleanCoverColor
+    )
+  ) {
+    throw new Error(
+      'Please select a valid cover color.'
+    );
+  }
+
+
+  if (
+    !isValidHexColor(
+      cleanSpineColor
+    )
+  ) {
+    throw new Error(
+      'Please select a valid spine color.'
+    );
+  }
+
+
+  /*
+    These are the only materials currently supported
+    by NotebookCover.jsx.
+  */
+
+  const allowedMaterials =
+    new Set([
+      'kraft',
+      'velvet',
+      'leather',
+    ]);
+
+
+  if (
+    !allowedMaterials.has(
+      cleanCoverMaterial
+    )
+  ) {
+    throw new Error(
+      'Please select a valid cover material.'
+    );
+  }
+
+
+  /* =======================================================
+     ADMIN-ONLY SAMPLE JOURNAL
+     -------------------------------------------------------
+     The client-side checkbox is not treated as a security
+     boundary.
+
+     When isSample is requested, the current user is checked
+     through the Supabase admin RPC.
+  ======================================================= */
+
+  const wantsSample =
+    Boolean(isSample);
+
+
+  if (wantsSample) {
+
+    const currentUserIsAdmin =
+      await checkIsAdmin();
+
+
+    if (!currentUserIsAdmin) {
+      throw new Error(
+        'Only administrators can create featured sample journals.'
+      );
+    }
+
+  }
+
+
+  /* =======================================================
+     INSERT JOURNAL
+  ======================================================= */
+
   const {
     data,
     error,
@@ -172,7 +355,7 @@ export async function createJournal({
       */
 
       title:
-        title?.trim() ||
+        cleanTitle ||
         null,
 
 
@@ -181,7 +364,7 @@ export async function createJournal({
       */
 
       description:
-        description?.trim() ||
+        cleanDescription ||
         null,
 
 
@@ -190,7 +373,7 @@ export async function createJournal({
       */
 
       author_name:
-        authorName?.trim() ||
+        cleanAuthorName ||
         null,
 
 
@@ -200,7 +383,7 @@ export async function createJournal({
       */
 
       journal_date:
-        journalDate ||
+        cleanJournalDate ||
         null,
 
 
@@ -221,8 +404,7 @@ export async function createJournal({
       */
 
       cover_color:
-        coverColor ||
-        '#c9a876',
+        cleanCoverColor,
 
 
       /*
@@ -230,8 +412,7 @@ export async function createJournal({
       */
 
       cover_material:
-        coverMaterial ||
-        'kraft',
+        cleanCoverMaterial,
 
 
       /*
@@ -239,31 +420,33 @@ export async function createJournal({
       */
 
       spine_color:
-        spineColor ||
-        '#8a6f47',
+        cleanSpineColor,
 
 
       /*
-        OPTION A:
-        Store whether this journal is featured
-        as a public sample.
+        Featured/sample state.
       */
 
       is_sample:
-        Boolean(isSample),
+        wantsSample,
 
 
       /*
-        OPTION A:
-        Give sample journals a public share token
-        immediately so Explore can open them.
+        Sample journals receive a public
+        share token immediately.
       */
 
       public_share_token:
-        isSample
+        wantsSample
           ? crypto.randomUUID()
           : null,
 
+
+      /*
+        IMPORTANT:
+        The owner ID always comes from the
+        authenticated Supabase user.
+      */
 
       owner_id:
         userData.user.id,
@@ -279,6 +462,163 @@ export async function createJournal({
 
 
   return data;
+}
+
+
+/* =========================================================
+   CREATE JOURNAL VALIDATION HELPERS
+========================================================= */
+
+function isValidHexColor(
+  value
+) {
+
+  return /^#[0-9a-f]{6}$/i.test(
+    value
+  );
+
+}
+
+
+function isValidJournalDate(
+  value
+) {
+
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      value
+    )
+  ) {
+    return false;
+  }
+
+
+  const [
+    year,
+    month,
+    day,
+  ] = value
+    .split('-')
+    .map(Number);
+
+
+  const date =
+    new Date(
+      Date.UTC(
+        year,
+        month - 1,
+        day
+      )
+    );
+
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+
+}
+
+
+/* =========================================================
+   SAFE JOURNAL CREATION ERROR
+   ---------------------------------------------------------
+   Raw database/auth/storage errors should not be shown
+   directly to the user.
+========================================================= */
+
+export function getSafeCreateJournalErrorMessage(
+  error
+) {
+
+  const message =
+    String(
+      error?.message ||
+      ''
+    ).toLowerCase();
+
+
+  if (
+    message.includes(
+      'row-level security'
+    ) ||
+    error?.code === '42501'
+  ) {
+    return (
+      'You do not have permission to create this journal.'
+    );
+  }
+
+
+  if (
+    message.includes(
+      'too many requests'
+    ) ||
+    message.includes(
+      'rate limit'
+    )
+  ) {
+    return (
+      'Too many requests. Please wait a little while and try again.'
+    );
+  }
+
+
+  if (
+    message.includes(
+      'failed to fetch'
+    ) ||
+    message.includes(
+      'network'
+    )
+  ) {
+    return (
+      'Connection problem. Please check your internet connection and try again.'
+    );
+  }
+
+
+  /*
+    These validation messages are generated by
+    this service and are safe to show.
+  */
+
+  const safeValidationMessages = [
+    'You must be signed in to create a journal.',
+    'Journal title must be 200 characters or fewer.',
+    'Journal description must be 2,000 characters or fewer.',
+    'Author name must be 120 characters or fewer.',
+    'Please enter a valid journal date.',
+    'Please select a valid cover color.',
+    'Please select a valid spine color.',
+    'Please select a valid cover material.',
+    'Only administrators can create featured sample journals.',
+    'Please select an image file.',
+    'Image must be smaller than 10 MB.',
+    'No cover image selected.',
+    'Could not generate public cover image URL.',
+  ];
+
+
+  const originalMessage =
+    error?.message;
+
+
+  if (
+    typeof originalMessage === 'string' &&
+    safeValidationMessages.includes(
+      originalMessage
+    )
+  ) {
+    return originalMessage;
+  }
+
+
+  return (
+    'Could not create the journal. Please try again.'
+  );
+
 }
 
 
@@ -351,6 +691,38 @@ export async function uploadJournalCover(
   if (!file) {
     throw new Error(
       'No cover image selected.'
+    );
+  }
+
+
+  if (
+    typeof file.type !== 'string' ||
+    !file.type.startsWith(
+      'image/'
+    )
+  ) {
+    throw new Error(
+      'Please select an image file.'
+    );
+  }
+
+
+  if (
+    file.size >
+    10 * 1024 * 1024
+  ) {
+    throw new Error(
+      'Image must be smaller than 10 MB.'
+    );
+  }
+
+
+  if (
+    side !== 'front' &&
+    side !== 'back'
+  ) {
+    throw new Error(
+      'Invalid cover side.'
     );
   }
 
@@ -521,7 +893,9 @@ export async function getPublicJournal(
   // Register the authenticated user as a viewer first.
   // Anonymous public viewing still works because the RPC
   // simply returns null when no user is signed in.
-  await registerPublicJournalViewer(shareToken);
+  await registerPublicJournalViewer(
+    shareToken
+  );
 
   const {
     data,
@@ -561,7 +935,9 @@ export async function getPublicPoems(
 
   // Also register here so the viewer is recorded even if this
   // function is called without getPublicJournal first.
-  await registerPublicJournalViewer(shareToken);
+  await registerPublicJournalViewer(
+    shareToken
+  );
 
   const {
     data,
