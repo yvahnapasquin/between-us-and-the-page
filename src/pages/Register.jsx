@@ -3,6 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
 
+import {
+  isValidEmail,
+  validatePassword,
+} from '../services/authService';
+
 import Button from '../components/Button';
 import Input from '../components/Input';
 
@@ -14,9 +19,9 @@ import Input from '../components/Input';
 const passwordRequirements = [
   {
     key: 'length',
-    label: 'At least 8 characters',
+    label: 'At least 12 characters',
     test: (password) =>
-      password.length >= 8,
+      password.length >= 12,
   },
 
   {
@@ -50,25 +55,15 @@ const passwordRequirements = [
 
 
 /* =========================================================
-   EMAIL VALIDATION
-========================================================= */
-
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-    email
-  );
-}
-
-
-/* =========================================================
    REGISTER PAGE
 ========================================================= */
 
 export default function Register() {
+  const { signUp } =
+    useAuth();
 
-  const { signUp } = useAuth();
-
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
 
 
   const [email, setEmail] =
@@ -95,14 +90,16 @@ export default function Register() {
     passwordRequirements.map(
       (requirement) => ({
         ...requirement,
-        valid: requirement.test(password),
+        valid:
+          requirement.test(password),
       })
     );
 
 
   const passwordIsValid =
     passwordChecks.every(
-      (requirement) => requirement.valid
+      (requirement) =>
+        requirement.valid
     );
 
 
@@ -111,7 +108,6 @@ export default function Register() {
   ======================================================= */
 
   async function handleSubmit(event) {
-
     event.preventDefault();
 
     setError(null);
@@ -126,7 +122,6 @@ export default function Register() {
     ------------------------------------------------------- */
 
     if (!cleanEmail) {
-
       setError(
         'Please enter your email address.'
       );
@@ -136,7 +131,6 @@ export default function Register() {
 
 
     if (!isValidEmail(cleanEmail)) {
-
       setError(
         'Please enter a valid email address.'
       );
@@ -149,8 +143,20 @@ export default function Register() {
        PASSWORD VALIDATION
     ------------------------------------------------------- */
 
-    if (!passwordIsValid) {
+    const passwordValidation =
+      validatePassword(password);
 
+
+    if (!passwordValidation.valid) {
+      setError(
+        passwordValidation.message
+      );
+
+      return;
+    }
+
+
+    if (!passwordIsValid) {
       setError(
         'Please make sure your password meets all of the requirements.'
       );
@@ -163,7 +169,6 @@ export default function Register() {
 
 
     try {
-
       const data =
         await signUp(
           cleanEmail,
@@ -175,46 +180,44 @@ export default function Register() {
         If Supabase returns a session immediately,
         email confirmation is disabled.
 
-        In that case, the user can go straight
-        to the dashboard.
+        In that configuration, the user can go
+        directly to the dashboard.
       */
 
       if (data?.session) {
-
         navigate('/dashboard');
-
         return;
       }
 
 
       /*
-        If there is no session, email confirmation
-        is enabled.
+        With email confirmation enabled, Supabase
+        normally returns a user but no session.
 
-        Show the confirmation message instead
-        of sending the user to the dashboard.
+        We do NOT consider the account fully verified
+        until the user confirms their email.
       */
 
       setRegisteredEmail(
         cleanEmail
       );
 
-
     } catch (err) {
-
       console.error(
         'Registration error:',
         err
       );
 
 
-      /* ---------------------------------------------------
-         FRIENDLY ERROR MESSAGES
-      --------------------------------------------------- */
-
       const message =
-        err?.message?.toLowerCase() || '';
+        String(
+          err?.message ?? ''
+        ).toLowerCase();
 
+
+      /* ---------------------------------------------------
+         INVALID EMAIL
+      --------------------------------------------------- */
 
       if (
         message.includes(
@@ -224,78 +227,87 @@ export default function Register() {
           'email address'
         )
       ) {
-
         setError(
           'Please enter a valid email address.'
         );
 
-      } else if (
+        return;
+      }
+
+
+      /* ---------------------------------------------------
+         PASSWORD
+      --------------------------------------------------- */
+
+      if (
         message.includes(
           'password'
-        ) &&
-        (
-          message.includes(
-            'weak'
-          ) ||
-          message.includes(
-            'strength'
-          )
         )
       ) {
-
         setError(
-          'Your password is too weak. Please meet all of the password requirements.'
+          'Your password does not meet the required security rules.'
         );
 
-      } else if (
-        message.includes(
-          'already registered'
-        ) ||
-        message.includes(
-          'already been registered'
-        )
-      ) {
+        return;
+      }
 
-        setError(
-          'This email is already registered. Try logging in instead.'
-        );
 
-      } else if (
+      /* ---------------------------------------------------
+         RATE LIMIT
+      --------------------------------------------------- */
+
+      if (
         message.includes(
           'rate limit'
         ) ||
         message.includes(
           'too many requests'
+        ) ||
+        message.includes(
+          '429'
         )
       ) {
-
         setError(
           'Too many registration attempts. Please wait a little while and try again.'
         );
 
-      } else if (
-        message.includes(
-          'email not authorized'
-        )
-      ) {
-
-        setError(
-          'This email cannot receive confirmation emails yet. Please check your Supabase email settings.'
-        );
-
-      } else {
-
-        setError(
-          err?.message ||
-          'Something went wrong while creating your account. Please try again.'
-        );
-
+        return;
       }
 
+
+      /* ---------------------------------------------------
+         EMAIL PROVIDER / DELIVERY
+      --------------------------------------------------- */
+
+      if (
+        message.includes(
+          'email not authorized'
+        ) ||
+        message.includes(
+          'email provider'
+        )
+      ) {
+        setError(
+          'We could not send the confirmation email right now. Please try again later.'
+        );
+
+        return;
+      }
+
+
+      /* ---------------------------------------------------
+         GENERIC ERROR
+         ---------------------------------------------------
+         We intentionally avoid displaying raw database,
+         authentication, or infrastructure errors to users.
+      */
+
+      setError(
+        'We could not create your account right now. Please check your information and try again.'
+      );
+
     } finally {
-
       setSubmitting(false);
-
     }
   }
 
@@ -305,7 +317,6 @@ export default function Register() {
   ======================================================= */
 
   if (registeredEmail) {
-
     return (
       <div
         className="
@@ -318,10 +329,6 @@ export default function Register() {
           py-20
         "
       >
-
-        {/* -------------------------------------------------
-            ICON
-        ------------------------------------------------- */}
 
         <div
           className="
@@ -362,10 +369,6 @@ export default function Register() {
 
         </div>
 
-
-        {/* -------------------------------------------------
-            MESSAGE
-        ------------------------------------------------- */}
 
         <div>
 
@@ -436,10 +439,6 @@ export default function Register() {
         </div>
 
 
-        {/* -------------------------------------------------
-            LOGIN BUTTON
-        ------------------------------------------------- */}
-
         <Button
           type="button"
           onClick={() =>
@@ -450,19 +449,13 @@ export default function Register() {
         </Button>
 
 
-        {/* -------------------------------------------------
-            BACK TO REGISTER
-        ------------------------------------------------- */}
-
         <button
           type="button"
           onClick={() => {
-
             setRegisteredEmail('');
             setEmail('');
             setPassword('');
             setError(null);
-
           }}
           className="
             font-body
@@ -543,15 +536,15 @@ export default function Register() {
           type="email"
           value={email}
           onChange={(event) => {
-
             setEmail(
               event.target.value
             );
 
             setError(null);
-
           }}
           autoComplete="email"
+          inputMode="email"
+          maxLength={254}
           placeholder="you@example.com"
           required
         />
@@ -567,17 +560,15 @@ export default function Register() {
           type="password"
           value={password}
           onChange={(event) => {
-
             setPassword(
               event.target.value
             );
 
             setError(null);
-
           }}
           autoComplete="new-password"
           placeholder="Create a strong password"
-          minLength={8}
+          minLength={12}
           required
         />
 
@@ -621,9 +612,10 @@ export default function Register() {
 
             {passwordChecks.map(
               (requirement) => (
-
                 <div
-                  key={requirement.key}
+                  key={
+                    requirement.key
+                  }
                   className="
                     flex
                     items-center
@@ -669,7 +661,6 @@ export default function Register() {
                   </span>
 
                 </div>
-
               )
             )}
 
@@ -683,7 +674,6 @@ export default function Register() {
         ================================================= */}
 
         {error && (
-
           <div
             className="
               rounded-md
@@ -706,7 +696,6 @@ export default function Register() {
             </p>
 
           </div>
-
         )}
 
 

@@ -2,7 +2,104 @@ import { supabase } from './supabase';
 
 
 /* =========================================================
-   GET THE URL WHERE USERS SHOULD GO AFTER CONFIRMING EMAIL
+   EMAIL VALIDATION
+========================================================= */
+
+export function normalizeEmail(email) {
+  return String(email ?? '')
+    .trim()
+    .toLowerCase();
+}
+
+
+export function isValidEmail(email) {
+  const normalizedEmail =
+    normalizeEmail(email);
+
+  /*
+    RFC-compliant email validation is much more complicated
+    than a frontend regex.
+
+    This check intentionally verifies the common requirements:
+    - exactly one @
+    - no whitespace
+    - local part exists
+    - domain exists
+    - domain contains a dot
+    - practical maximum length
+  */
+
+  if (
+    !normalizedEmail ||
+    normalizedEmail.length > 254
+  ) {
+    return false;
+  }
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    normalizedEmail
+  );
+}
+
+
+/* =========================================================
+   PASSWORD VALIDATION
+========================================================= */
+
+export function validatePassword(password) {
+  const value =
+    String(password ?? '');
+
+  if (value.length < 12) {
+    return {
+      valid: false,
+      message:
+        'Password must be at least 12 characters long.',
+    };
+  }
+
+  if (!/[a-z]/.test(value)) {
+    return {
+      valid: false,
+      message:
+        'Password must contain at least one lowercase letter.',
+    };
+  }
+
+  if (!/[A-Z]/.test(value)) {
+    return {
+      valid: false,
+      message:
+        'Password must contain at least one uppercase letter.',
+    };
+  }
+
+  if (!/[0-9]/.test(value)) {
+    return {
+      valid: false,
+      message:
+        'Password must contain at least one number.',
+    };
+  }
+
+  if (!/[^A-Za-z0-9\s]/.test(value)) {
+    return {
+      valid: false,
+      message:
+        'Password must contain at least one symbol.',
+    };
+  }
+
+  return {
+    valid: true,
+    message: null,
+  };
+}
+
+
+/* =========================================================
+   GET THE URL WHERE USERS SHOULD GO AFTER
+   CONFIRMING THEIR EMAIL
 ========================================================= */
 
 function getEmailRedirectUrl() {
@@ -14,6 +111,10 @@ function getEmailRedirectUrl() {
 
     Production:
     https://your-site.com/between-us-and-the-page/#/dashboard
+
+    IMPORTANT:
+    This URL must also be included in Supabase
+    Authentication > URL Configuration > Redirect URLs.
   */
 
   return `${window.location.origin}${import.meta.env.BASE_URL}#/dashboard`;
@@ -25,23 +126,43 @@ function getEmailRedirectUrl() {
 ========================================================= */
 
 export async function signUp(email, password) {
-  const cleanEmail = email.trim().toLowerCase();
+  const cleanEmail =
+    normalizeEmail(email);
+
+  if (!isValidEmail(cleanEmail)) {
+    throw new Error(
+      'Please enter a valid email address.'
+    );
+  }
+
+  const passwordValidation =
+    validatePassword(password);
+
+  if (!passwordValidation.valid) {
+    throw new Error(
+      passwordValidation.message
+    );
+  }
 
   const {
     data,
     error,
   } = await supabase.auth.signUp({
     email: cleanEmail,
+
     password,
 
     options: {
       /*
-        Supabase will send the confirmation email.
+        Supabase sends the email confirmation message.
 
-        After the user clicks the confirmation link,
-        they will be redirected back to the dashboard.
+        The user must verify ownership of the email address
+        before they can complete the normal login flow when
+        Confirm Email is enabled in Supabase.
       */
-      emailRedirectTo: getEmailRedirectUrl(),
+
+      emailRedirectTo:
+        getEmailRedirectUrl(),
     },
   });
 
@@ -59,12 +180,30 @@ export async function signUp(email, password) {
    SIGN IN
 ========================================================= */
 
-export async function signIn(email, password) {
+export async function signIn(
+  email,
+  password
+) {
+  const cleanEmail =
+    normalizeEmail(email);
+
+  if (!isValidEmail(cleanEmail)) {
+    throw new Error(
+      'Please enter a valid email address.'
+    );
+  }
+
+  if (!password) {
+    throw new Error(
+      'Please enter your password.'
+    );
+  }
+
   const {
     data,
     error,
   } = await supabase.auth.signInWithPassword({
-    email: email.trim().toLowerCase(),
+    email: cleanEmail,
     password,
   });
 
@@ -83,7 +222,9 @@ export async function signIn(email, password) {
 ========================================================= */
 
 export async function signOut() {
-  const { error } =
+  const {
+    error,
+  } =
     await supabase.auth.signOut();
 
 
@@ -98,9 +239,20 @@ export async function signOut() {
 ========================================================= */
 
 export async function resetPassword(email) {
-  const { error } =
+  const cleanEmail =
+    normalizeEmail(email);
+
+  if (!isValidEmail(cleanEmail)) {
+    throw new Error(
+      'Please enter a valid email address.'
+    );
+  }
+
+  const {
+    error,
+  } =
     await supabase.auth.resetPasswordForEmail(
-      email.trim().toLowerCase()
+      cleanEmail
     );
 
 
@@ -118,7 +270,8 @@ export async function getSession() {
   const {
     data,
     error,
-  } = await supabase.auth.getSession();
+  } =
+    await supabase.auth.getSession();
 
 
   if (error) {
@@ -135,14 +288,14 @@ export async function getSession() {
 ========================================================= */
 
 export function onAuthStateChange(callback) {
-
   const {
     data: listener,
-  } = supabase.auth.onAuthStateChange(
-    (_event, session) => {
-      callback(session);
-    }
-  );
+  } =
+    supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        callback(session);
+      }
+    );
 
 
   return () =>
