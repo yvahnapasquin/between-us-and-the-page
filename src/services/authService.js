@@ -98,7 +98,7 @@ export function validatePassword(password) {
 
 
 /* =========================================================
-   SAFE AUTH ERROR MESSAGE
+   SAFE REGISTRATION ERROR MESSAGE
 ========================================================= */
 
 export function getSafeAuthErrorMessage(error) {
@@ -202,6 +202,100 @@ export function getSafeAuthErrorMessage(error) {
   ------------------------------------------------------- */
 
   return 'We could not create your account right now. Please check your information and try again.';
+}
+
+
+/* =========================================================
+   SAFE LOGIN ERROR MESSAGE
+========================================================= */
+
+export function getSafeLoginErrorMessage(error) {
+  const message =
+    String(
+      error?.message ?? ''
+    ).toLowerCase();
+
+
+  /* -------------------------------------------------------
+     EMAIL NOT CONFIRMED
+  ------------------------------------------------------- */
+
+  if (
+    message.includes(
+      'email not confirmed'
+    ) ||
+    message.includes(
+      'email_not_confirmed'
+    )
+  ) {
+    return 'Please confirm your email address before logging in.';
+  }
+
+
+  /* -------------------------------------------------------
+     RATE LIMIT
+  ------------------------------------------------------- */
+
+  if (
+    message.includes(
+      'rate limit'
+    ) ||
+    message.includes(
+      'too many requests'
+    ) ||
+    message.includes(
+      '429'
+    )
+  ) {
+    return 'Too many login attempts. Please wait a little while and try again.';
+  }
+
+
+  /* -------------------------------------------------------
+     CAPTCHA / BOT PROTECTION
+  ------------------------------------------------------- */
+
+  if (
+    message.includes(
+      'captcha'
+    ) ||
+    message.includes(
+      'bot'
+    )
+  ) {
+    return 'Login verification could not be completed. Please try again.';
+  }
+
+
+  /* -------------------------------------------------------
+     NETWORK / CONNECTION
+  ------------------------------------------------------- */
+
+  if (
+    message.includes(
+      'network'
+    ) ||
+    message.includes(
+      'failed to fetch'
+    ) ||
+    message.includes(
+      'fetch failed'
+    )
+  ) {
+    return 'We could not connect to the login service. Please check your connection and try again.';
+  }
+
+
+  /* -------------------------------------------------------
+     INVALID CREDENTIALS / GENERIC AUTH ERROR
+     
+     Keep this message intentionally generic.
+     
+     Do not tell the user whether the email exists.
+     Do not expose raw Supabase authentication errors.
+  ------------------------------------------------------- */
+
+  return 'That email and password combination did not work.';
 }
 
 
