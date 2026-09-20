@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   isValidEmail,
   validatePassword,
+  getSafeAuthErrorMessage,
 } from '../services/authService';
 
 import Button from '../components/Button';
@@ -177,133 +178,46 @@ export default function Register() {
 
 
       /*
-        If Supabase returns a session immediately,
-        email confirmation is disabled.
+        With Confirm Email enabled in Supabase,
+        signUp() returns a user but no session.
 
-        In that configuration, the user can go
-        directly to the dashboard.
+        The account is not considered ready for normal
+        login until the user confirms ownership of the
+        email address.
       */
 
-      if (data?.session) {
-        navigate('/dashboard');
+      if (!data?.session) {
+        setRegisteredEmail(
+          cleanEmail
+        );
+
         return;
       }
 
 
       /*
-        With email confirmation enabled, Supabase
-        normally returns a user but no session.
+        A session immediately after registration means
+        email confirmation is disabled in the Supabase
+        project.
 
-        We do NOT consider the account fully verified
-        until the user confirms their email.
-      */
-
-      setRegisteredEmail(
-        cleanEmail
-      );
-
-    } catch (err) {
-      console.error(
-        'Registration error:',
-        err
-      );
-
-
-      const message =
-        String(
-          err?.message ?? ''
-        ).toLowerCase();
-
-
-      /* ---------------------------------------------------
-         INVALID EMAIL
-      --------------------------------------------------- */
-
-      if (
-        message.includes(
-          'invalid email'
-        ) ||
-        message.includes(
-          'email address'
-        )
-      ) {
-        setError(
-          'Please enter a valid email address.'
-        );
-
-        return;
-      }
-
-
-      /* ---------------------------------------------------
-         PASSWORD
-      --------------------------------------------------- */
-
-      if (
-        message.includes(
-          'password'
-        )
-      ) {
-        setError(
-          'Your password does not meet the required security rules.'
-        );
-
-        return;
-      }
-
-
-      /* ---------------------------------------------------
-         RATE LIMIT
-      --------------------------------------------------- */
-
-      if (
-        message.includes(
-          'rate limit'
-        ) ||
-        message.includes(
-          'too many requests'
-        ) ||
-        message.includes(
-          '429'
-        )
-      ) {
-        setError(
-          'Too many registration attempts. Please wait a little while and try again.'
-        );
-
-        return;
-      }
-
-
-      /* ---------------------------------------------------
-         EMAIL PROVIDER / DELIVERY
-      --------------------------------------------------- */
-
-      if (
-        message.includes(
-          'email not authorized'
-        ) ||
-        message.includes(
-          'email provider'
-        )
-      ) {
-        setError(
-          'We could not send the confirmation email right now. Please try again later.'
-        );
-
-        return;
-      }
-
-
-      /* ---------------------------------------------------
-         GENERIC ERROR
-         ---------------------------------------------------
-         We intentionally avoid displaying raw database,
-         authentication, or infrastructure errors to users.
+        The app does not silently treat this as the
+        normal verified-email flow.
       */
 
       setError(
-        'We could not create your account right now. Please check your information and try again.'
+        'Your account was created, but email confirmation is not enabled. Please enable Confirm Email in the Supabase Authentication settings before using account registration.'
+      );
+
+    } catch (err) {
+      /*
+        Do not display raw authentication, database,
+        or infrastructure errors to the user.
+
+        The service converts them into safe messages.
+      */
+
+      setError(
+        getSafeAuthErrorMessage(err)
       );
 
     } finally {

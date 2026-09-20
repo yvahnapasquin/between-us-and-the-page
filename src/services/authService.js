@@ -98,6 +98,114 @@ export function validatePassword(password) {
 
 
 /* =========================================================
+   SAFE AUTH ERROR MESSAGE
+========================================================= */
+
+export function getSafeAuthErrorMessage(error) {
+  const message =
+    String(
+      error?.message ?? ''
+    ).toLowerCase();
+
+
+  /* -------------------------------------------------------
+     INVALID EMAIL
+  ------------------------------------------------------- */
+
+  if (
+    message.includes(
+      'invalid email'
+    ) ||
+    message.includes(
+      'email address'
+    )
+  ) {
+    return 'Please enter a valid email address.';
+  }
+
+
+  /* -------------------------------------------------------
+     PASSWORD
+  ------------------------------------------------------- */
+
+  if (
+    message.includes(
+      'password'
+    )
+  ) {
+    return 'Your password does not meet the required security rules.';
+  }
+
+
+  /* -------------------------------------------------------
+     RATE LIMIT
+  ------------------------------------------------------- */
+
+  if (
+    message.includes(
+      'rate limit'
+    ) ||
+    message.includes(
+      'too many requests'
+    ) ||
+    message.includes(
+      '429'
+    )
+  ) {
+    return 'Too many registration attempts. Please wait a little while and try again.';
+  }
+
+
+  /* -------------------------------------------------------
+     EMAIL DELIVERY
+  ------------------------------------------------------- */
+
+  if (
+    message.includes(
+      'email not authorized'
+    ) ||
+    message.includes(
+      'email provider'
+    ) ||
+    message.includes(
+      'smtp'
+    ) ||
+    message.includes(
+      'sending email'
+    )
+  ) {
+    return 'We could not send the confirmation email right now. Please try again later.';
+  }
+
+
+  /* -------------------------------------------------------
+     CAPTCHA / BOT PROTECTION
+  ------------------------------------------------------- */
+
+  if (
+    message.includes(
+      'captcha'
+    ) ||
+    message.includes(
+      'bot'
+    )
+  ) {
+    return 'Account verification could not be completed. Please try again.';
+  }
+
+
+  /* -------------------------------------------------------
+     GENERIC AUTHENTICATION ERROR
+     
+     Do not expose raw Supabase, database, infrastructure,
+     or authentication errors to the user.
+  ------------------------------------------------------- */
+
+  return 'We could not create your account right now. Please check your information and try again.';
+}
+
+
+/* =========================================================
    GET THE URL WHERE USERS SHOULD GO AFTER
    CONFIRMING THEIR EMAIL
 ========================================================= */
@@ -159,6 +267,9 @@ export async function signUp(email, password) {
         The user must verify ownership of the email address
         before they can complete the normal login flow when
         Confirm Email is enabled in Supabase.
+
+        The redirect URL must also be configured in:
+        Authentication > URL Configuration > Redirect URLs.
       */
 
       emailRedirectTo:
