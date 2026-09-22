@@ -1041,7 +1041,6 @@ export default function Dashboard() {
       console.error(error);
 
       setErrorMessage(
-        error?.message ||
         'Could not remove the shared journal. Please try again.'
       );
 
