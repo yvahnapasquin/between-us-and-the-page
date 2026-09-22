@@ -2021,7 +2021,7 @@ export default function Dashboard() {
               px-3
               py-2.5
               shadow-sm
-            
+
           "
           >
 
@@ -2192,6 +2192,8 @@ export default function Dashboard() {
         ) : (
 
           <div
+            role="status"
+            aria-live="polite"
             className="
               rounded-xl
               border
@@ -3219,7 +3221,7 @@ export default function Dashboard() {
                   uppercase
                   tracking-wide
                   text-ink-soft
-                "
+              "
               >
                 {sharedJournalToRemove.title ||
                   'Untitled journal'}
