@@ -589,6 +589,8 @@ export default function Register() {
 
         {error && (
           <div
+            role="alert"
+            aria-live="polite"
             className="
               rounded-md
               border
