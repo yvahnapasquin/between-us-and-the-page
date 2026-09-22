@@ -138,6 +138,40 @@ export default function Chat() {
   ] = useState('');
 
 
+  function getFriendlyChatError(
+    err,
+    fallback
+  ) {
+
+    const message =
+      err?.message || '';
+
+    if (
+      err?.code === '23503' ||
+      message.toLowerCase().includes('foreign key')
+    ) {
+      return 'That user or friend is no longer available.';
+    }
+
+    if (
+      err?.code === '42501' ||
+      message.toLowerCase().includes('row-level security')
+    ) {
+      return 'You do not have permission to perform that action.';
+    }
+
+    if (
+      message.toLowerCase().includes('network') ||
+      message.toLowerCase().includes('fetch')
+    ) {
+      return 'Could not connect right now. Please check your connection and try again.';
+    }
+
+    return message || fallback;
+
+  }
+
+
   /* =======================================================
      LOAD CHAT DATA
   ======================================================= */
@@ -232,8 +266,10 @@ export default function Chat() {
 
 
       setError(
-        err?.message ||
-        'Could not load chat.'
+        getFriendlyChatError(
+          err,
+          'Could not load chat.'
+        )
       );
 
     } finally {
@@ -307,8 +343,10 @@ export default function Chat() {
         if (!cancelled) {
 
           setError(
-            err?.message ||
-            'Could not load messages.'
+            getFriendlyChatError(
+              err,
+              'Could not load messages.'
+            )
           );
 
         }
@@ -392,8 +430,10 @@ export default function Chat() {
 
 
       setError(
-        err?.message ||
-        'Could not search for that user.'
+        getFriendlyChatError(
+          err,
+          'Could not search for that user.'
+        )
       );
 
     } finally {
@@ -508,8 +548,10 @@ export default function Chat() {
 
 
       setError(
-        err?.message ||
-        'Could not update the friend request.'
+        getFriendlyChatError(
+          err,
+          'Could not update the friend request.'
+        )
       );
 
     }
@@ -576,8 +618,10 @@ export default function Chat() {
 
 
       setError(
-        err?.message ||
-        'Could not send the message.'
+        getFriendlyChatError(
+          err,
+          'Could not send the message.'
+        )
       );
 
     } finally {
