@@ -985,10 +985,7 @@ export default function Dashboard() {
       console.error(error);
 
       const errorMessage =
-        error?.message ||
-        error?.details ||
-        error?.hint ||
-        'Could not create the journal. Please try again.';
+        getSafeCreateJournalErrorMessage(error);
 
 
       setErrorMessage(
