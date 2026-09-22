@@ -336,7 +336,6 @@ export default function Dashboard() {
       console.error(error);
 
       setErrorMessage(
-        error?.message ||
         'Could not delete the selected books. Please try again.'
       );
 
