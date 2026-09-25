@@ -391,6 +391,52 @@ export async function createCollaborationBook({
 
 
 /* =========================================================
+   ADD AN EXISTING JOURNAL TO A COLLABORATION
+   ---------------------------------------------------------
+   Reuses the existing journal record instead of creating
+   a duplicate journal.
+
+   Authorization and insertion are handled by the secure
+   database RPC.
+========================================================= */
+
+export async function addExistingJournalToCollaboration({
+  spaceId,
+  journalId,
+}) {
+
+  if (!spaceId || !journalId) {
+    throw new Error(
+      'A collaboration and journal are required.'
+    );
+  }
+
+
+  const {
+    data,
+    error,
+  } = await supabase.rpc(
+    'add_existing_journal_to_collaboration',
+    {
+      p_space_id:
+        spaceId,
+
+      p_journal_id:
+        journalId,
+    }
+  );
+
+
+  if (error) {
+    throw error;
+  }
+
+
+  return data;
+}
+
+
+/* =========================================================
    REMOVE BOOK FROM SHARED LIBRARY
 ========================================================= */
 

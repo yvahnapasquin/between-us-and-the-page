@@ -16,6 +16,10 @@ import {
 } from '../services/journalService';
 import { useAsync } from '../hooks/useAsync';
 import { supabase } from '../services/supabase';
+import {
+  addExistingJournalToCollaboration,
+  getMyCollaborationSpaces,
+} from '../services/collaborationService';
 import { useAuth } from '../context/AuthContext';
 import { materialOptions } from '../components/NotebookCover';
 import JournalCard from '../components/JournalCard';
@@ -114,6 +118,26 @@ export default function Dashboard() {
   const [
     deletingSelectedBooks,
     setDeletingSelectedBooks,
+  ] = useState(false);
+
+  const [
+    collaborationSpaces,
+    setCollaborationSpaces,
+  ] = useState([]);
+
+  const [
+    showCollaborationForm,
+    setShowCollaborationForm,
+  ] = useState(false);
+
+  const [
+    selectedCollaborationId,
+    setSelectedCollaborationId,
+  ] = useState('');
+
+  const [
+    addingToCollaboration,
+    setAddingToCollaboration,
   ] = useState(false);
 
   const [
@@ -241,6 +265,62 @@ export default function Dashboard() {
 
     setBookcaseName('');
     setShowBookcaseForm(true);
+  }
+
+  async function openCollaborationForm() {
+    if (!selectedJournalIds.length) {
+      return;
+    }
+
+    try {
+      const spaces = await getMyCollaborationSpaces();
+
+      setCollaborationSpaces(spaces);
+      setSelectedCollaborationId('');
+      setShowCollaborationForm(true);
+    } catch (error) {
+      console.error(error);
+
+      setErrorMessage(
+        'Could not load your collaboration spaces. Please try again.'
+      );
+    }
+  }
+
+  async function addSelectedToCollaboration() {
+    if (
+      !selectedCollaborationId ||
+      !selectedJournalIds.length
+    ) {
+      return;
+    }
+
+    setAddingToCollaboration(true);
+
+    try {
+      await Promise.all(
+        selectedJournalIds.map((journalId) =>
+          addExistingJournalToCollaboration({
+            spaceId: selectedCollaborationId,
+            journalId,
+          })
+        )
+      );
+
+      setShowCollaborationForm(false);
+      setSelectedCollaborationId('');
+      setCollaborationSpaces([]);
+      exitSelectionMode();
+
+    } catch (error) {
+      console.error(error);
+
+      setErrorMessage(
+        'Could not add the selected journals to the collaboration. Please try again.'
+      );
+    } finally {
+      setAddingToCollaboration(false);
+    }
   }
 
   async function createBookcase() {
@@ -2204,6 +2284,15 @@ export default function Dashboard() {
 
               <button
                 type="button"
+                onClick={openCollaborationForm}
+                disabled={!selectedJournalIds.length || addingToCollaboration}
+                className="rounded-md border border-ink/20 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-ink transition hover:border-ink/40 hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Add to collaboration
+              </button>
+
+              <button
+                type="button"
                 onClick={() => {
                   if (!selectedJournalIds.length) return;
                   setSelectedBooksToDelete(true);
@@ -2866,6 +2955,110 @@ export default function Dashboard() {
         )}
 
       </section>
+
+
+      {showCollaborationForm && (
+
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-4 backdrop-blur-sm"
+          onClick={() => {
+            if (!addingToCollaboration) {
+              setShowCollaborationForm(false);
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-to-collaboration-title"
+            className="w-full max-w-md rounded-2xl border border-ink/10 bg-paper p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="add-to-collaboration-title"
+              className="font-display text-xl text-ink"
+            >
+              Add to collaboration
+            </h2>
+
+            <p className="mt-2 font-body text-sm leading-6 text-ink-soft">
+              Choose a shared space for the {selectedJournalIds.length}{' '}
+              selected {selectedJournalIds.length === 1 ? 'journal' : 'journals'}.
+              The existing journal will be added without creating a duplicate.
+            </p>
+
+            {collaborationSpaces.length ? (
+              <div className="mt-5 space-y-2">
+                {collaborationSpaces.map((space) => (
+                  <label
+                    key={space.id}
+                    className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 transition ${
+                      selectedCollaborationId === space.id
+                        ? 'border-ink/40 bg-ink/5'
+                        : 'border-ink/10 hover:border-ink/25 hover:bg-ink/5'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="selected-collaboration"
+                      value={space.id}
+                      checked={selectedCollaborationId === space.id}
+                      onChange={(e) =>
+                        setSelectedCollaborationId(e.target.value)
+                      }
+                      className="h-4 w-4 accent-ink"
+                    />
+
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-display text-base text-ink">
+                        {space.name}
+                      </span>
+
+                      {space.description && (
+                        <span className="mt-0.5 block truncate font-body text-xs text-ink-soft">
+                          {space.description}
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-xl border border-dashed border-ink/15 bg-ink/[0.02] px-4 py-5 text-center">
+                <p className="font-body text-sm text-ink-soft">
+                  You are not a member of any collaboration spaces yet.
+                </p>
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCollaborationForm(false)}
+                disabled={addingToCollaboration}
+                className="rounded-lg border border-ink/15 px-4 py-2.5 font-mono text-xs uppercase tracking-wide text-ink-soft transition hover:border-ink/30 hover:bg-ink/5 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={addSelectedToCollaboration}
+                disabled={
+                  addingToCollaboration ||
+                  !selectedCollaborationId
+                }
+                className="rounded-lg bg-ink px-4 py-2.5 font-mono text-xs uppercase tracking-wide text-paper transition hover:opacity-90 disabled:opacity-50"
+              >
+                {addingToCollaboration
+                  ? 'Adding…'
+                  : 'Add to collaboration'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+      )}
 
 
       {showBookcaseForm && (

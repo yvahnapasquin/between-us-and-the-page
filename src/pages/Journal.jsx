@@ -716,6 +716,16 @@ export default function Journal() {
 
 
   const [
+    deleteSectionModal,
+    setDeleteSectionModal,
+  ] = useState({
+    open: false,
+    sectionId: null,
+    title: '',
+  });
+
+
+  const [
     journalOverride,
     setJournalOverride,
   ] = useState(null);
@@ -1548,23 +1558,42 @@ export default function Journal() {
   }
 
 
-  async function deleteTocSection(sectionId) {
+  function openDeleteTocSection(section) {
 
     if (!canEdit) {
       return;
     }
 
 
-    const confirmed =
-      window.confirm(
-        'Remove this section from the table of contents?'
-      );
+    setDeleteSectionModal({
+      open: true,
+      sectionId: section.id,
+      title: section.title || 'Untitled section',
+    });
+
+  }
 
 
-    if (!confirmed) {
+  function closeDeleteTocSection() {
+
+    setDeleteSectionModal({
+      open: false,
+      sectionId: null,
+      title: '',
+    });
+
+  }
+
+
+  async function handleDeleteTocSection() {
+
+    if (!canEdit || !deleteSectionModal.sectionId) {
       return;
     }
 
+
+    const sectionId =
+      deleteSectionModal.sectionId;
 
     const nextSections =
       tocSections.filter(
@@ -1572,11 +1601,14 @@ export default function Journal() {
           section.id !== sectionId
       );
 
+    const previousSections =
+      tocSections;
 
     setTocSections(nextSections);
+    closeDeleteTocSection();
 
     try {
-      const updatedJournal =
+      const updatedSections =
         await updateJournalTocSections(
           activeJournal.id,
           nextSections
@@ -1584,12 +1616,12 @@ export default function Journal() {
 
       setJournalOverride((current) => ({
         ...(current || activeJournal),
-        toc_sections: updatedJournal,
+        toc_sections: updatedSections,
       }));
     } catch (error) {
       console.error(error);
 
-      setTocSections(tocSections);
+      setTocSections(previousSections);
     }
 
   }
@@ -2243,7 +2275,7 @@ export default function Journal() {
             }
 
             onDeleteSection={
-              deleteTocSection
+              openDeleteTocSection
             }
 
             isContinuation={
@@ -2314,7 +2346,7 @@ export default function Journal() {
                 }
 
                 onDeleteSection={
-                  deleteTocSection
+                  openDeleteTocSection
                 }
 
                 isContinuation
@@ -3457,6 +3489,89 @@ export default function Journal() {
 
 
       {/* ===================================================
+          DELETE SECTION MODAL
+      =================================================== */}
+
+      {deleteSectionModal.open && (
+
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 px-4"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeDeleteTocSection();
+            }
+          }}
+        >
+
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-section-title"
+            className="w-full max-w-sm rounded-xl border border-black/10 bg-[#f7f3ea] p-5 shadow-2xl"
+            onMouseDown={(event) =>
+              event.stopPropagation()
+            }
+          >
+
+            <div className="mb-4">
+
+              <h3
+                id="delete-section-title"
+                className="text-base font-semibold text-[#2b2a27]"
+              >
+                Delete Section
+              </h3>
+
+              <p className="mt-1 text-sm text-[#77736b]">
+                Are you sure you want to remove this section from the table of contents?
+              </p>
+
+            </div>
+
+
+            <div className="rounded-lg border border-black/10 bg-white/60 px-3 py-2.5">
+
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#77736b]">
+                Section
+              </p>
+
+              <p className="mt-1 break-words text-sm font-medium text-[#2b2a27]">
+                {deleteSectionModal.title}
+              </p>
+
+            </div>
+
+
+            <div className="mt-5 flex justify-end gap-2">
+
+              <button
+                type="button"
+                onClick={closeDeleteTocSection}
+                className="rounded-lg border border-black/10 px-4 py-2 text-sm font-medium text-[#77736b] transition hover:bg-black/5"
+              >
+                Cancel
+              </button>
+
+
+              <button
+                type="button"
+                onClick={handleDeleteTocSection}
+                className="rounded-lg bg-[#8a3b32] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+              >
+                Delete Section
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
+
+      {/* ===================================================
           SHARE MODAL
       =================================================== */}
 
@@ -4100,7 +4215,7 @@ function TocPage({
                       <button
                         type="button"
                         onClick={() =>
-                          onDeleteSection(item.section.id)
+                          onDeleteSection(item.section)
                         }
                         aria-label={`Delete ${item.section.title}`}
                         title="Delete section"
