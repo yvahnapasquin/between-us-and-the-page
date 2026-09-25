@@ -1313,8 +1313,8 @@ export default function DraggableWidget({
               right-0
               z-20
               flex
-              h-11
-              w-11
+              h-5
+              w-5
               cursor-se-resize
               items-end
               justify-end
@@ -1348,8 +1348,8 @@ export default function DraggableWidget({
           >
 
             <svg
-              width="15"
-              height="15"
+              width="9"
+              height="9"
               viewBox="0 0 12 12"
               fill="none"
               stroke="white"
@@ -1358,8 +1358,8 @@ export default function DraggableWidget({
               aria-hidden="true"
               pointerEvents="none"
               className="
-                mb-2
-                mr-2
+                mb-1
+                mr-1
               "
             >
 
