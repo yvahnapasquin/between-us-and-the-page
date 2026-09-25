@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
 } from 'react';
 
@@ -56,6 +57,12 @@ export default function Chat() {
     messages,
     setMessages,
   ] = useState([]);
+
+
+  const messagesContainerRef = useRef(null);
+
+
+  const shouldScrollToBottomRef = useRef(false);
 
 
   const [
@@ -168,6 +175,42 @@ export default function Chat() {
     }
 
     return message || fallback;
+
+  }
+
+
+  function formatMessageDate(dateValue) {
+
+    const date = new Date(dateValue);
+    const now = new Date();
+
+    const startOfDay = (value) =>
+      new Date(
+        value.getFullYear(),
+        value.getMonth(),
+        value.getDate()
+      );
+
+    const dayDifference =
+      Math.round(
+        (startOfDay(now).getTime() -
+          startOfDay(date).getTime()) /
+          (24 * 60 * 60 * 1000)
+      );
+
+    if (dayDifference === 0) {
+      return 'Today';
+    }
+
+    if (dayDifference === 1) {
+      return 'Yesterday';
+    }
+
+    return date.toLocaleDateString(undefined, {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
 
   }
 
@@ -377,6 +420,47 @@ export default function Chat() {
     };
 
   }, [selectedFriend]);
+
+
+  /* =======================================================
+     KEEP CHAT VIEW AT THE BOTTOM WHEN NEEDED
+  ======================================================= */
+
+  useEffect(() => {
+
+    if (!selectedFriend) {
+
+      return;
+
+    }
+
+    shouldScrollToBottomRef.current = true;
+
+  }, [selectedFriend]);
+
+
+  useEffect(() => {
+
+    const container =
+      messagesContainerRef.current;
+
+
+    if (
+      !container ||
+      !shouldScrollToBottomRef.current
+    ) {
+
+      return;
+
+    }
+
+
+    container.scrollTop =
+      container.scrollHeight;
+
+    shouldScrollToBottomRef.current = false;
+
+  }, [messages]);
 
 
   /* =======================================================
@@ -598,6 +682,8 @@ export default function Chat() {
 
       if (message) {
 
+        shouldScrollToBottomRef.current = true;
+
         setMessages(
           (current) => [
             ...current,
@@ -611,6 +697,8 @@ export default function Chat() {
       setMessageInput('');
 
     } catch (err) {
+
+      shouldScrollToBottomRef.current = false;
 
       console.error(
         err
@@ -1975,11 +2063,15 @@ export default function Chat() {
           ================================================= */}
 
           <div
+            ref={messagesContainerRef}
             className="
-              flex-1
-              space-y-3
+              h-[460px]
+              min-h-0
               overflow-y-auto
               p-5
+              lg:h-[520px]
+              [scrollbar-width:none]
+              [&::-webkit-scrollbar]:hidden
             "
           >
 
@@ -2014,12 +2106,39 @@ export default function Chat() {
 
 
             {messages.map(
-              (message) => {
+              (message, index) => {
 
                 const mine =
                   message.sender_id ===
                   user.id;
 
+                const previousMessage =
+                  messages[index - 1];
+
+                const hasTimeGap =
+                  previousMessage &&
+                  new Date(
+                    message.created_at
+                  ).getTime() -
+                    new Date(
+                      previousMessage.created_at
+                    ).getTime() >=
+                    5 * 60 * 1000;
+
+                const currentDate =
+                  formatMessageDate(
+                    message.created_at
+                  );
+
+                const previousDate =
+                  previousMessage
+                    ? formatMessageDate(
+                        previousMessage.created_at
+                      )
+                    : null;
+
+                const showDate =
+                  currentDate !== previousDate;
 
                 return (
 
@@ -2027,57 +2146,119 @@ export default function Chat() {
                     key={
                       message.id
                     }
-                    className={`
-                      flex
-                      ${
-                        mine
-                          ? 'justify-end'
-                          : 'justify-start'
-                      }
-                    `}
                   >
+
+                    {showDate && (
+
+                      <div
+                        className="
+                          mb-3
+                          mt-1
+                          flex
+                          items-center
+                          gap-3
+                        "
+                      >
+
+                        <div
+                          className="
+                            h-px
+                            flex-1
+                            bg-ink/10
+                          "
+                        />
+
+                        <span
+                          className="
+                            shrink-0
+                            font-mono
+                            text-[10px]
+                            uppercase
+                            tracking-[0.14em]
+                            text-ink-soft
+                          "
+                        >
+                          {currentDate}
+                        </span>
+
+                        <div
+                          className="
+                            h-px
+                            flex-1
+                            bg-ink/10
+                          "
+                        />
+
+                      </div>
+
+                    )}
 
                     <div
                       className={`
-                        max-w-[80%]
-                        rounded-xl
-                        px-4
-                        py-2.5
+                        flex
+                        ${
+                          hasTimeGap
+                            ? 'mt-7'
+                            : index === 0 || showDate
+                              ? 'mt-0'
+                              : 'mt-0.5'
+                        }
                         ${
                           mine
-                            ? 'bg-ink text-paper'
-                            : 'border border-ink/10 bg-paper'
+                            ? 'justify-end'
+                            : 'justify-start'
                         }
                       `}
                     >
 
-                      <p
-                        className="
-                          whitespace-pre-wrap
-                          break-words
-                          text-sm
-                          leading-5
-                        "
-                      >
-                        {message.content}
-                      </p>
-
-
-                      <p
+                      <div
                         className={`
-                          mt-1
-                          text-[10px]
+                          max-w-[80%]
+                          rounded-xl
+                          px-4
+                          py-2.5
                           ${
                             mine
-                              ? 'text-paper/60'
-                              : 'text-ink-soft'
+                              ? 'bg-ink text-paper'
+                              : 'border border-ink/10 bg-paper'
                           }
                         `}
                       >
-                        {new Date(
-                          message.created_at
-                        ).toLocaleString()}
-                      </p>
+
+                        <p
+                          className="
+                            whitespace-pre-wrap
+                            break-words
+                            text-sm
+                            leading-5
+                          "
+                        >
+                          {message.content}
+                        </p>
+
+                        <p
+                          className={`
+                            mt-1
+                            text-[10px]
+                            ${
+                              mine
+                                ? 'text-paper/60'
+                                : 'text-ink-soft'
+                            }
+                          `}
+                        >
+                          {new Date(
+                            message.created_at
+                          ).toLocaleTimeString(
+                            [],
+                            {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            }
+                          )}
+                        </p>
+
+                      </div>
 
                     </div>
 
@@ -2133,7 +2314,7 @@ export default function Chat() {
                   px-3
                   py-2
                   font-body
-                  text-sm
+                  text-base
                   outline-none
                   focus:border-ink/50
                 "
