@@ -48,6 +48,7 @@ import EditJournalModal from '../components/EditJournalModal';
 ========================================================= */
 
 const TURN_DURATION = 720;
+const TOC_TURN_DURATION = 180;
 
 const TOC_ITEMS_PER_PAGE = 6;
 
@@ -670,6 +671,12 @@ export default function Journal() {
   const [
     isTurning,
     setIsTurning,
+  ] = useState(false);
+
+
+  const [
+    isReturningToToc,
+    setIsReturningToToc,
   ] = useState(false);
 
 
@@ -1822,6 +1829,114 @@ export default function Journal() {
 
 
   /* =======================================================
+     RETURN TO TABLE OF CONTENTS
+  ======================================================= */
+
+  function goToTableOfContents() {
+
+    if (isTurning) {
+      return;
+    }
+
+
+    const target = 2;
+
+
+    if (locationRef.current <= target) {
+      return;
+    }
+
+
+    setIsReturningToToc(true);
+
+
+    const turnBack = () => {
+
+      const location =
+        locationRef.current;
+
+
+      if (location <= target) {
+        return;
+      }
+
+
+      const paperId =
+        location - 1;
+
+
+      turningPaperRef.current =
+        paperId;
+
+
+      setIsTurning(true);
+
+
+      setFlippedPapers(
+        (previous) => {
+
+          const next =
+            new Set(previous);
+
+
+          next.delete(paperId);
+
+
+          return next;
+
+        }
+      );
+
+
+      const nextLocation =
+        location - 1;
+
+
+      locationRef.current =
+        nextLocation;
+
+
+      setCurrentLocation(
+        nextLocation
+      );
+
+
+      window.setTimeout(
+        () => {
+
+          turningPaperRef.current =
+            null;
+
+
+          setIsTurning(false);
+
+
+          if (
+            locationRef.current >
+            target
+          ) {
+
+            turnBack();
+
+          } else {
+
+            setIsReturningToToc(false);
+
+          }
+
+        },
+        TOC_TURN_DURATION + 50
+      );
+
+    };
+
+
+    turnBack();
+
+  }
+
+
+  /* =======================================================
      BUILD PAPER LIST
   ======================================================= */
 
@@ -2286,6 +2401,10 @@ export default function Journal() {
 
               onSaveTextStyle={
                 savePoemTextStyle
+              }
+
+              onBackToToc={
+                goToTableOfContents
               }
 
             />
@@ -2826,6 +2945,26 @@ export default function Journal() {
         </button>
 
 
+        <button
+
+          disabled={
+            currentLocation <= 2 ||
+            isTurning
+          }
+
+          onClick={
+            goToTableOfContents
+          }
+
+          title="Back to table of contents"
+
+        >
+
+          TOC
+
+        </button>
+
+
         <span>
 
           {getLocationLabel()}
@@ -2953,6 +3092,9 @@ export default function Journal() {
 
                   style={{
                     zIndex,
+                    transition: isReturningToToc
+                      ? `transform ${TOC_TURN_DURATION}ms cubic-bezier(0.22, 0.61, 0.36, 1)`
+                      : undefined,
                   }}
 
                 >
@@ -3014,6 +3156,24 @@ export default function Journal() {
         >
 
           ← PREVIOUS
+
+        </button>
+
+
+        <button
+
+          disabled={
+            currentLocation <= 2 ||
+            isTurning
+          }
+
+          onClick={
+            goToTableOfContents
+          }
+
+        >
+
+          TOC
 
         </button>
 
@@ -3852,6 +4012,7 @@ function PoemPage({
   isOwner,
   onEditJournal,
   onDeleteJournal,
+  onBackToToc,
   pageNumber,
   totalPages,
   isFirstPage,
