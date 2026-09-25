@@ -706,6 +706,16 @@ export default function Journal() {
 
 
   const [
+    sectionModal,
+    setSectionModal,
+  ] = useState({
+    open: false,
+    afterPoemIndex: -1,
+    title: '',
+  });
+
+
+  const [
     journalOverride,
     setJournalOverride,
   ] = useState(null);
@@ -919,9 +929,9 @@ export default function Journal() {
 
         if (!cancelled) {
           setJournalOverride((current) => ({
-        ...(current || activeJournal),
-        toc_sections: updatedJournal,
-      }));
+            ...(current || activeJournal),
+            toc_sections: updatedJournal,
+          }));
         }
 
       } catch (error) {
@@ -1396,7 +1406,7 @@ export default function Journal() {
   }
 
 
-  async function addTocSection(
+  function addTocSection(
     afterPoemIndex = -1
   ) {
 
@@ -1405,14 +1415,27 @@ export default function Journal() {
     }
 
 
+    setSectionModal({
+      open: true,
+      afterPoemIndex,
+      title: '',
+    });
+
+  }
+
+
+  async function handleSectionModalSubmit() {
+
+    if (!canEdit) {
+      return;
+    }
+
+
     const title =
-      window.prompt(
-        'Section name',
-        'Section 1'
-      );
+      sectionModal.title.trim();
 
 
-    if (!title?.trim()) {
+    if (!title) {
       return;
     }
 
@@ -1421,12 +1444,16 @@ export default function Journal() {
 
       id: createTocSectionId(),
 
-      title: title.trim(),
+      title,
 
-      afterPoemIndex,
+      afterPoemIndex:
+        sectionModal.afterPoemIndex,
 
     };
 
+
+    const previousSections =
+      tocSections;
 
     const nextSections = [
       ...tocSections,
@@ -1436,8 +1463,14 @@ export default function Journal() {
 
     setTocSections(nextSections);
 
+    setSectionModal({
+      open: false,
+      afterPoemIndex: -1,
+      title: '',
+    });
+
     try {
-      const updatedJournal =
+      const updatedSections =
         await updateJournalTocSections(
           activeJournal.id,
           nextSections
@@ -1445,12 +1478,19 @@ export default function Journal() {
 
       setJournalOverride((current) => ({
         ...(current || activeJournal),
-        toc_sections: updatedJournal,
+        toc_sections: updatedSections,
       }));
     } catch (error) {
       console.error(error);
 
-      setTocSections(tocSections);
+      setTocSections(previousSections);
+
+      setSectionModal({
+        open: true,
+        afterPoemIndex:
+          sectionModal.afterPoemIndex,
+        title,
+      });
     }
 
   }
@@ -3295,6 +3335,125 @@ export default function Journal() {
         </button>
 
       </div>
+
+
+      {/* ===================================================
+          ADD SECTION MODAL
+      =================================================== */}
+
+      {sectionModal.open && (
+
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 px-4"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setSectionModal({
+                open: false,
+                afterPoemIndex: -1,
+                title: '',
+              });
+            }
+          }}
+        >
+
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-section-title"
+            className="w-full max-w-sm rounded-xl border border-black/10 bg-[#f7f3ea] p-5 shadow-2xl"
+            onMouseDown={(event) =>
+              event.stopPropagation()
+            }
+          >
+
+            <div className="mb-4">
+
+              <h3
+                id="add-section-title"
+                className="text-base font-semibold text-[#2b2a27]"
+              >
+                Add Section
+              </h3>
+
+              <p className="mt-1 text-sm text-[#77736b]">
+                Enter the name for this section.
+              </p>
+
+            </div>
+
+
+            <label
+              htmlFor="toc-section-name"
+              className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[#77736b]"
+            >
+              Section name
+            </label>
+
+            <input
+              id="toc-section-name"
+              type="text"
+              value={sectionModal.title}
+              onChange={(event) =>
+                setSectionModal((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
+              }
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  handleSectionModalSubmit();
+                }
+
+                if (event.key === 'Escape') {
+                  setSectionModal({
+                    open: false,
+                    afterPoemIndex: -1,
+                    title: '',
+                  });
+                }
+              }}
+              placeholder="e.g. Part I — Beginnings"
+              autoFocus
+              maxLength={80}
+              className="w-full rounded-lg border border-black/15 bg-white px-3 py-2.5 text-sm text-[#2b2a27] outline-none transition focus:border-[#8a6f47] focus:ring-2 focus:ring-[#8a6f47]/15"
+            />
+
+
+            <div className="mt-5 flex justify-end gap-2">
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSectionModal({
+                    open: false,
+                    afterPoemIndex: -1,
+                    title: '',
+                  })
+                }
+                className="rounded-lg border border-black/10 px-4 py-2 text-sm font-medium text-[#77736b] transition hover:bg-black/5"
+              >
+                Cancel
+              </button>
+
+
+              <button
+                type="button"
+                onClick={handleSectionModalSubmit}
+                disabled={!sectionModal.title.trim()}
+                className="rounded-lg bg-[#2b2a27] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Add Section
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
 
 
       {/* ===================================================
