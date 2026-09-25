@@ -8,6 +8,9 @@ import { toSpotifyEmbedUrl } from '../utils/spotify';
 const SPOTIFY_IFRAME_API_SRC =
   'https://open.spotify.com/embed/iframe-api/v1';
 
+const SPOTIFY_PLAY_EVENT =
+  'between-us-spotify-play';
+
 let spotifyApiPromise = null;
 
 function loadSpotifyIframeApi() {
@@ -98,6 +101,9 @@ export default function SpotifyPlayer({
   const controllerRef =
     useRef(null);
 
+  const isPlayingRef =
+    useRef(false);
+
   useEffect(() => {
 
     let cancelled = false;
@@ -109,6 +115,59 @@ export default function SpotifyPlayer({
     ) {
       return undefined;
     }
+
+    function stopThisPlayer() {
+
+      const controller =
+        controllerRef.current;
+
+      if (
+        controller &&
+        typeof controller.pause ===
+          'function'
+      ) {
+
+        try {
+          controller.pause();
+        } catch {
+          // Ignore Spotify cleanup errors.
+        }
+
+      }
+
+      isPlayingRef.current =
+        false;
+
+    }
+
+    function handleOtherSpotifyPlay(
+      event
+    ) {
+
+      /*
+        If another SpotifyPlayer started
+        playing, stop this player.
+
+        The source controller is included
+        in the event so the player that
+        started playback does not pause itself.
+      */
+
+      if (
+        event.detail?.controller ===
+        controllerRef.current
+      ) {
+        return;
+      }
+
+      stopThisPlayer();
+
+    }
+
+    window.addEventListener(
+      SPOTIFY_PLAY_EVENT,
+      handleOtherSpotifyPlay
+    );
 
     loadSpotifyIframeApi()
       .then((api) => {
@@ -163,6 +222,69 @@ export default function SpotifyPlayer({
             controllerRef.current =
               controller;
 
+            /*
+              Listen for Spotify playback
+              changes.
+
+              When this player starts playing,
+              notify every other SpotifyPlayer
+              in the application.
+            */
+
+            if (
+              typeof controller.addListener ===
+                'function'
+            ) {
+
+              controller.addListener(
+                'playback_update',
+                (event) => {
+
+                  if (
+                    cancelled
+                  ) {
+                    return;
+                  }
+
+                  const isPlaying =
+                    Boolean(
+                      event?.data?.isPaused ===
+                        false
+                    );
+
+                  if (
+                    isPlaying &&
+                    !isPlayingRef.current
+                  ) {
+
+                    isPlayingRef.current =
+                      true;
+
+                    window.dispatchEvent(
+                      new CustomEvent(
+                        SPOTIFY_PLAY_EVENT,
+                        {
+                          detail: {
+                            controller,
+                          },
+                        }
+                      )
+                    );
+
+                  } else if (
+                    !isPlaying
+                  ) {
+
+                    isPlayingRef.current =
+                      false;
+
+                  }
+
+                }
+              );
+
+            }
+
           }
         );
 
@@ -180,6 +302,11 @@ export default function SpotifyPlayer({
 
       cancelled = true;
 
+      window.removeEventListener(
+        SPOTIFY_PLAY_EVENT,
+        handleOtherSpotifyPlay
+      );
+
       if (
         controllerRef.current &&
         typeof controllerRef.current.destroy ===
@@ -196,6 +323,9 @@ export default function SpotifyPlayer({
 
       controllerRef.current =
         null;
+
+      isPlayingRef.current =
+        false;
 
     };
 
