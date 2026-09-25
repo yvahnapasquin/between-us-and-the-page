@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getMyJournals } from '../services/journalService';
+import {
+  getMyJournals,
+  getBookcases,
+  updateBookcase as updateBookcaseRecord,
+  subscribeToBookcases,
+} from '../services/journalService';
 import { useAsync } from '../hooks/useAsync';
 import { useAuth } from '../context/AuthContext';
 import JournalCard from '../components/JournalCard';
@@ -13,26 +18,64 @@ export default function BookcasePage() {
   const [bookcase, setBookcase] = useState(null);
 
   useEffect(() => {
+    let active = true;
+
     if (!user?.id) {
       setBookcase(null);
-      return;
+      return () => {
+        active = false;
+      };
     }
 
-    try {
-      const storageKey = `between-us-bookcases-${user.id}`;
-      const saved = window.localStorage.getItem(storageKey);
-      const parsed = saved ? JSON.parse(saved) : [];
-      const found = Array.isArray(parsed)
-        ? parsed.find((item) => item.id === bookcaseId)
-        : null;
+    async function loadBookcase() {
+      try {
+        const bookcases = await getBookcases();
 
-      setBookcase(
-        found ? { ...found, storageKey } : null
-      );
-    } catch (error) {
-      console.error(error);
-      setBookcase(null);
+        if (!active) {
+          return;
+        }
+
+        const found = bookcases.find(
+          (item) => item.id === bookcaseId
+        );
+
+        setBookcase(found || null);
+      } catch (error) {
+        console.error(error);
+
+        if (active) {
+          setBookcase(null);
+        }
+      }
     }
+
+    loadBookcase();
+
+    const unsubscribe = subscribeToBookcases(
+      user.id,
+      async () => {
+        try {
+          const bookcases = await getBookcases();
+
+          if (!active) {
+            return;
+          }
+
+          const found = bookcases.find(
+            (item) => item.id === bookcaseId
+          );
+
+          setBookcase(found || null);
+        } catch (error) {
+          console.error(error);
+        }
+      }
+    );
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [bookcaseId, user?.id]);
 
   const books = useMemo(() => {
@@ -42,34 +85,25 @@ export default function BookcasePage() {
     return (journals || []).filter((journal) => ids.has(journal.id));
   }, [bookcase, journals]);
 
-  function removeFromBookcase(journalId) {
-    if (!bookcase?.storageKey) return;
+  async function removeFromBookcase(journalId) {
+    if (!bookcase?.id) {
+      return;
+    }
+
+    const nextJournalIds =
+      (bookcase.journalIds || []).filter(
+        (id) => id !== journalId
+      );
 
     try {
-      const saved = window.localStorage.getItem(bookcase.storageKey);
-      const bookcases = saved ? JSON.parse(saved) : [];
-      const updated = bookcases.map((item) =>
-        item.id === bookcase.id
-          ? {
-              ...item,
-              journalIds: (item.journalIds || []).filter(
-                (id) => id !== journalId
-              ),
-            }
-          : item
+      const updated = await updateBookcaseRecord(
+        bookcase.id,
+        {
+          journalIds: nextJournalIds,
+        }
       );
 
-      window.localStorage.setItem(
-        bookcase.storageKey,
-        JSON.stringify(updated)
-      );
-
-      setBookcase((current) => ({
-        ...current,
-        journalIds: (current.journalIds || []).filter(
-          (id) => id !== journalId
-        ),
-      }));
+      setBookcase(updated);
     } catch (error) {
       console.error(error);
     }

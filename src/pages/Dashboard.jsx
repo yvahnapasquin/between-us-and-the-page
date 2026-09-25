@@ -7,6 +7,12 @@ import {
   uploadJournalCover,
   updateJournalCoverImages,
   getSafeCreateJournalErrorMessage,
+  getBookcases,
+  createBookcase as createBookcaseRecord,
+  updateBookcase as updateBookcaseRecord,
+  deleteBookcase as deleteBookcaseRecord,
+  migrateLocalBookcases,
+  subscribeToBookcases,
 } from '../services/journalService';
 import { useAsync } from '../hooks/useAsync';
 import { supabase } from '../services/supabase';
@@ -115,48 +121,89 @@ export default function Dashboard() {
     setErrorMessage,
   ] = useState('');
 
-  const bookcaseStorageKey =
-    user?.id
-      ? `between-us-bookcases-${user.id}`
-      : null;
-
   useEffect(() => {
+    let active = true;
 
-    if (!bookcaseStorageKey) {
+    if (!user?.id) {
       setBookcases([]);
-      return;
+      return () => {
+        active = false;
+      };
     }
 
-    try {
-      const saved =
-        window.localStorage.getItem(
-          bookcaseStorageKey
+    async function loadBookcases() {
+      try {
+        /*
+          Move any bookcases created by the older localStorage
+          version into Supabase before loading the shared data.
+        */
+        await migrateLocalBookcases();
+
+        const data = await getBookcases();
+
+        if (active) {
+          setBookcases(data);
+        }
+      } catch (error) {
+        console.error(error);
+
+        if (active) {
+          setBookcases([]);
+          setErrorMessage(
+            'Could not load your bookcases. Please try again.'
+          );
+        }
+      }
+    }
+
+    loadBookcases();
+
+    /*
+      Supabase Realtime keeps this browser updated when the
+      same account changes bookcases from another browser,
+      phone, tablet, laptop, or PC.
+    */
+    let unsubscribe = null;
+
+    async function setupBookcaseSubscription() {
+      try {
+        const cleanup = await subscribeToBookcases(
+          async () => {
+            try {
+              const data = await getBookcases();
+
+              if (active) {
+                setBookcases(data);
+              }
+            } catch (error) {
+              console.error(error);
+            }
+          }
         );
 
-      const parsed = saved ? JSON.parse(saved) : [];
-
-      setBookcases(
-        Array.isArray(parsed) ? parsed : []
-      );
-    } catch (error) {
-      console.error(error);
-      setBookcases([]);
+        if (active) {
+          unsubscribe = cleanup;
+        } else if (typeof cleanup === 'function') {
+          cleanup();
+        }
+      } catch (error) {
+        console.error(
+          'Could not subscribe to bookcase updates:',
+          error
+        );
+      }
     }
 
-  }, [bookcaseStorageKey]);
+    setupBookcaseSubscription();
 
-  function saveBookcases(nextBookcases) {
-    if (!bookcaseStorageKey) {
-      return;
-    }
+    return () => {
+      active = false;
 
-    window.localStorage.setItem(
-      bookcaseStorageKey,
-      JSON.stringify(nextBookcases)
-    );
-
-    setBookcases(nextBookcases);
-  }
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [user?.id]);
 
   function enterSelectionMode(journalId) {
 
@@ -196,74 +243,136 @@ export default function Dashboard() {
     setShowBookcaseForm(true);
   }
 
-  function createBookcase() {
-
+  async function createBookcase() {
     const name =
       bookcaseName.trim() ||
       'New bookcase';
 
-    const nextBookcases = [
-      ...bookcases,
-      {
-        id: `bookcase-${Date.now()}`,
+    try {
+      const created = await createBookcaseRecord(
         name,
-        journalIds: [...selectedJournalIds],
-      },
+        selectedJournalIds
+      );
+
+      setBookcases((current) => [
+        ...current,
+        created,
+      ]);
+
+      setShowBookcaseForm(false);
+      setBookcaseName('');
+      exitSelectionMode();
+    } catch (error) {
+      console.error(error);
+
+      setErrorMessage(
+        'Could not create the bookcase. Please try again.'
+      );
+    }
+  }
+
+  async function addToBookcase(bookcaseId) {
+    const bookcase = bookcases.find(
+      (item) => item.id === bookcaseId
+    );
+
+    if (!bookcase) {
+      return;
+    }
+
+    const nextJournalIds = [
+      ...new Set([
+        ...(bookcase.journalIds || []),
+        ...selectedJournalIds,
+      ]),
     ];
 
-    saveBookcases(nextBookcases);
+    try {
+      const updated = await updateBookcaseRecord(
+        bookcaseId,
+        {
+          journalIds: nextJournalIds,
+        }
+      );
 
-    setShowBookcaseForm(false);
-    setBookcaseName('');
-    exitSelectionMode();
+      setBookcases((current) =>
+        current.map((item) =>
+          item.id === bookcaseId
+            ? updated
+            : item
+        )
+      );
+
+      exitSelectionMode();
+    } catch (error) {
+      console.error(error);
+
+      setErrorMessage(
+        'Could not add the selected books to the bookcase. Please try again.'
+      );
+    }
   }
 
-  function addToBookcase(bookcaseId) {
-
-    const nextBookcases = bookcases.map((bookcase) => {
-      if (bookcase.id !== bookcaseId) {
-        return bookcase;
-      }
-
-      return {
-        ...bookcase,
-        journalIds: [
-          ...new Set([
-            ...(bookcase.journalIds || []),
-            ...selectedJournalIds,
-          ]),
-        ],
-      };
-    });
-
-    saveBookcases(nextBookcases);
-    exitSelectionMode();
-  }
-
-  function removeFromBookcase(bookcaseId, journalId) {
-
-    const nextBookcases = bookcases.map((bookcase) =>
-      bookcase.id === bookcaseId
-        ? {
-            ...bookcase,
-            journalIds: (bookcase.journalIds || []).filter(
-              (id) => id !== journalId
-            ),
-          }
-        : bookcase
+  async function removeFromBookcase(
+    bookcaseId,
+    journalId
+  ) {
+    const bookcase = bookcases.find(
+      (item) => item.id === bookcaseId
     );
 
-    saveBookcases(nextBookcases);
+    if (!bookcase) {
+      return;
+    }
+
+    const nextJournalIds =
+      (bookcase.journalIds || []).filter(
+        (id) => id !== journalId
+      );
+
+    try {
+      const updated = await updateBookcaseRecord(
+        bookcaseId,
+        {
+          journalIds: nextJournalIds,
+        }
+      );
+
+      setBookcases((current) =>
+        current.map((item) =>
+          item.id === bookcaseId
+            ? updated
+            : item
+        )
+      );
+    } catch (error) {
+      console.error(error);
+
+      setErrorMessage(
+        'Could not remove the book from the bookcase. Please try again.'
+      );
+    }
   }
 
-  function deleteBookcase(bookcaseId) {
+  async function deleteBookcase(bookcaseId) {
+    try {
+      await deleteBookcaseRecord(bookcaseId);
 
-    const nextBookcases = bookcases.filter(
-      (bookcase) => bookcase.id !== bookcaseId
-    );
+      setBookcases((current) =>
+        current.filter(
+          (bookcase) =>
+            bookcase.id !== bookcaseId
+        )
+      );
 
-    saveBookcases(nextBookcases);
-    setBookcaseToDelete(null);
+      setBookcaseToDelete(null);
+    } catch (error) {
+      console.error(error);
+
+      setErrorMessage(
+        'Could not delete the bookcase. Please try again.'
+      );
+    }
   }
 
   function openBookcaseEdit(bookcase) {
@@ -271,7 +380,7 @@ export default function Dashboard() {
     setBookcaseToEdit(bookcase);
   }
 
-  function updateBookcaseName() {
+  async function updateBookcaseName() {
     if (!bookcaseToEdit) {
       return;
     }
@@ -280,18 +389,31 @@ export default function Dashboard() {
       bookcaseName.trim() ||
       'New bookcase';
 
-    const nextBookcases = bookcases.map((bookcase) =>
-      bookcase.id === bookcaseToEdit.id
-        ? {
-            ...bookcase,
-            name,
-          }
-        : bookcase
-    );
+    try {
+      const updated = await updateBookcaseRecord(
+        bookcaseToEdit.id,
+        {
+          name,
+        }
+      );
 
-    saveBookcases(nextBookcases);
-    setBookcaseToEdit(null);
-    setBookcaseName('');
+      setBookcases((current) =>
+        current.map((bookcase) =>
+          bookcase.id === bookcaseToEdit.id
+            ? updated
+            : bookcase
+        )
+      );
+
+      setBookcaseToEdit(null);
+      setBookcaseName('');
+    } catch (error) {
+      console.error(error);
+
+      setErrorMessage(
+        'Could not rename the bookcase. Please try again.'
+      );
+    }
   }
 
   async function deleteSelectedBooks() {
@@ -319,12 +441,27 @@ export default function Dashboard() {
           journalIds: (bookcase.journalIds || []).filter(
             (id) => !deletedIds.has(id)
           ),
-        }))
-        .filter(
-          (bookcase) => bookcase.journalIds.length
+        }));
+
+      const updatedBookcases = [];
+
+      for (const bookcase of nextBookcases) {
+        if (!bookcase.journalIds.length) {
+          await deleteBookcaseRecord(bookcase.id);
+          continue;
+        }
+
+        const updated = await updateBookcaseRecord(
+          bookcase.id,
+          {
+            journalIds: bookcase.journalIds,
+          }
         );
 
-      saveBookcases(nextBookcases);
+        updatedBookcases.push(updated);
+      }
+
+      setBookcases(updatedBookcases);
 
       setDeletingSelectedBooks(false);
       setSelectedBooksToDelete(false);
