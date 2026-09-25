@@ -16,6 +16,7 @@ import {
   getJournal,
   getPublicJournal,
   getPublicPoems,
+  updateJournalTocSections,
 } from '../services/journalService';
 
 import {
@@ -822,8 +823,24 @@ export default function Journal() {
     poems ?? [];
 
 
+  const isOwner =
+    !isPublicView &&
+    journal &&
+    user &&
+    journal.owner_id ===
+      user.id;
+
+
+  const canEdit =
+    Boolean(isOwner) ||
+    journalAccess?.role === 'editor';
+
+
   /* =======================================================
      TABLE OF CONTENTS SECTIONS
+     -------------------------------------------------------
+     Stored in Supabase so the same journal layout is visible
+     across browsers and shared views.
   ======================================================= */
 
   const [
@@ -834,65 +851,97 @@ export default function Journal() {
 
   useEffect(() => {
 
-    if (!activeJournal?.id) {
-      setTocSections([]);
-      return;
+    let cancelled = false;
+
+
+    async function loadTocSections() {
+
+      if (!activeJournal?.id) {
+        setTocSections([]);
+        return;
+      }
+
+
+      const databaseSections =
+        activeJournal?.toc_sections;
+
+
+      if (Array.isArray(databaseSections)) {
+
+        if (!cancelled) {
+          setTocSections(databaseSections);
+        }
+
+
+        if (
+          databaseSections.length > 0 ||
+          !canEdit
+        ) {
+          return;
+        }
+      }
+
+
+      // One-time migration for sections created by the older
+      // localStorage-only version of the feature.
+      try {
+
+        const storageKey =
+          `${TOC_SECTION_STORAGE_KEY}-${activeJournal.id}`;
+
+        const legacySections =
+          JSON.parse(
+            localStorage.getItem(storageKey) ||
+              '[]'
+          );
+
+
+        if (
+          !Array.isArray(legacySections) ||
+          legacySections.length === 0 ||
+          !canEdit
+        ) {
+          return;
+        }
+
+
+        if (!cancelled) {
+          setTocSections(legacySections);
+        }
+
+
+        const updatedJournal =
+          await updateJournalTocSections(
+            activeJournal.id,
+            legacySections
+          );
+
+
+        if (!cancelled) {
+          setJournalOverride((current) => ({
+        ...(current || activeJournal),
+        toc_sections: updatedJournal,
+      }));
+        }
+
+      } catch (error) {
+        console.error(error);
+      }
+
     }
 
 
-    const storageKey =
-      `${TOC_SECTION_STORAGE_KEY}-${activeJournal.id}`;
+    loadTocSections();
 
 
-    try {
-
-      const stored =
-        JSON.parse(
-          localStorage.getItem(storageKey) ||
-            '[]'
-        );
-
-
-      setTocSections(
-        Array.isArray(stored)
-          ? stored
-          : []
-      );
-
-    } catch {
-
-      setTocSections([]);
-
-    }
-
-  }, [activeJournal?.id]);
-
-
-  useEffect(() => {
-
-    if (!activeJournal?.id) {
-      return;
-    }
-
-
-    const storageKey =
-      `${TOC_SECTION_STORAGE_KEY}-${activeJournal.id}`;
-
-
-    try {
-
-      localStorage.setItem(
-        storageKey,
-        JSON.stringify(tocSections)
-      );
-
-    } catch {
-      // Ignore localStorage errors.
-    }
+    return () => {
+      cancelled = true;
+    };
 
   }, [
     activeJournal?.id,
-    tocSections,
+    activeJournal?.toc_sections,
+    canEdit,
   ]);
 
 
@@ -952,19 +1001,6 @@ export default function Journal() {
     user,
     isPublicView,
   ]);
-
-
-  const isOwner =
-    !isPublicView &&
-    journal &&
-    user &&
-    journal.owner_id ===
-      user.id;
-
-
-  const canEdit =
-    Boolean(isOwner) ||
-    journalAccess?.role === 'editor';
 
 
   /* =======================================================
@@ -1360,7 +1396,7 @@ export default function Journal() {
   }
 
 
-  function addTocSection(
+  async function addTocSection(
     afterPoemIndex = -1
   ) {
 
@@ -1392,15 +1428,35 @@ export default function Journal() {
     };
 
 
-    setTocSections((current) => [
-      ...current,
+    const nextSections = [
+      ...tocSections,
       nextSection,
-    ]);
+    ];
+
+
+    setTocSections(nextSections);
+
+    try {
+      const updatedJournal =
+        await updateJournalTocSections(
+          activeJournal.id,
+          nextSections
+        );
+
+      setJournalOverride((current) => ({
+        ...(current || activeJournal),
+        toc_sections: updatedJournal,
+      }));
+    } catch (error) {
+      console.error(error);
+
+      setTocSections(tocSections);
+    }
 
   }
 
 
-  function editTocSection(section) {
+  async function editTocSection(section) {
 
     if (!canEdit) {
       return;
@@ -1419,21 +1475,40 @@ export default function Journal() {
     }
 
 
-    setTocSections((current) =>
-      current.map((item) =>
+    const nextSections =
+      tocSections.map((item) =>
         item.id === section.id
           ? {
               ...item,
               title: title.trim(),
             }
           : item
-      )
-    );
+      );
+
+
+    setTocSections(nextSections);
+
+    try {
+      const updatedJournal =
+        await updateJournalTocSections(
+          activeJournal.id,
+          nextSections
+        );
+
+      setJournalOverride((current) => ({
+        ...(current || activeJournal),
+        toc_sections: updatedJournal,
+      }));
+    } catch (error) {
+      console.error(error);
+
+      setTocSections(tocSections);
+    }
 
   }
 
 
-  function deleteTocSection(sectionId) {
+  async function deleteTocSection(sectionId) {
 
     if (!canEdit) {
       return;
@@ -1451,12 +1526,31 @@ export default function Journal() {
     }
 
 
-    setTocSections((current) =>
-      current.filter(
+    const nextSections =
+      tocSections.filter(
         (section) =>
           section.id !== sectionId
-      )
-    );
+      );
+
+
+    setTocSections(nextSections);
+
+    try {
+      const updatedJournal =
+        await updateJournalTocSections(
+          activeJournal.id,
+          nextSections
+        );
+
+      setJournalOverride((current) => ({
+        ...(current || activeJournal),
+        toc_sections: updatedJournal,
+      }));
+    } catch (error) {
+      console.error(error);
+
+      setTocSections(tocSections);
+    }
 
   }
 

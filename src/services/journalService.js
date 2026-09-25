@@ -566,6 +566,44 @@ export async function updateJournal(
 
 
 /* =========================================================
+   UPDATE TABLE OF CONTENTS SECTIONS
+   ---------------------------------------------------------
+   Persists TOC sectioning in Supabase so it is shared across
+   browsers and available to users with journal access.
+========================================================= */
+
+export async function updateJournalTocSections(
+  journalId,
+  sections
+) {
+  const safeSections =
+    Array.isArray(sections)
+      ? sections
+      : [];
+
+
+  const {
+    data,
+    error,
+  } = await supabase.rpc(
+    'update_journal_toc_sections',
+    {
+      p_journal_id: journalId,
+      p_toc_sections: safeSections,
+    }
+  );
+
+
+  if (error) {
+    throw error;
+  }
+
+
+  return data;
+}
+
+
+/* =========================================================
    DELETE JOURNAL
 ========================================================= */
 
@@ -810,7 +848,29 @@ export async function getPublicJournal(
   }
 
 
-  return data.journal;
+  const {
+    data: tocSections,
+    error: tocSectionsError,
+  } = await supabase.rpc(
+    'get_public_journal_toc_sections',
+    {
+      p_share_token: shareToken,
+    }
+  );
+
+
+  if (tocSectionsError) {
+    throw tocSectionsError;
+  }
+
+
+  return {
+    ...data.journal,
+    toc_sections:
+      Array.isArray(tocSections)
+        ? tocSections
+        : [],
+  };
 }
 
 
