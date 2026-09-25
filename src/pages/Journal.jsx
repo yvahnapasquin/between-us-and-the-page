@@ -63,6 +63,10 @@ const POEM_STYLE_STORAGE_KEY =
   'between-us-poem-text-styles';
 
 
+const TOC_SECTION_STORAGE_KEY =
+  'between-us-toc-sections';
+
+
 const DEFAULT_POEM_TEXT_STYLES = {
 
   title: {
@@ -504,8 +508,66 @@ function paginatePoem(
    TABLE OF CONTENTS PAGINATION
 ========================================================= */
 
+function buildTocItems(
+  poems,
+  sections
+) {
+
+  const safeSections =
+    Array.isArray(sections)
+      ? sections
+      : [];
+
+
+  const items = [];
+
+
+  const addSectionsAfter = (
+    afterPoemIndex
+  ) => {
+
+    safeSections
+      .filter(
+        (section) =>
+          Number(section.afterPoemIndex) ===
+          afterPoemIndex
+      )
+      .forEach((section) => {
+
+        items.push({
+          type: 'section',
+          section,
+        });
+
+      });
+
+  };
+
+
+  addSectionsAfter(-1);
+
+
+  poems.forEach((poem, index) => {
+
+    items.push({
+      type: 'poem',
+      poem,
+      poemIndex: index,
+    });
+
+
+    addSectionsAfter(index);
+
+  });
+
+
+  return items;
+
+}
+
+
 function paginateToc(
-  poems
+  items
 ) {
 
   const pages = [];
@@ -513,12 +575,12 @@ function paginateToc(
 
   for (
     let index = 0;
-    index < poems.length;
+    index < items.length;
     index += TOC_ITEMS_PER_PAGE
   ) {
 
     pages.push(
-      poems.slice(
+      items.slice(
         index,
         index +
           TOC_ITEMS_PER_PAGE
@@ -754,6 +816,80 @@ export default function Journal() {
 
 
   /* =======================================================
+     TABLE OF CONTENTS SECTIONS
+  ======================================================= */
+
+  const [
+    tocSections,
+    setTocSections,
+  ] = useState([]);
+
+
+  useEffect(() => {
+
+    if (!activeJournal?.id) {
+      setTocSections([]);
+      return;
+    }
+
+
+    const storageKey =
+      `${TOC_SECTION_STORAGE_KEY}-${activeJournal.id}`;
+
+
+    try {
+
+      const stored =
+        JSON.parse(
+          localStorage.getItem(storageKey) ||
+            '[]'
+        );
+
+
+      setTocSections(
+        Array.isArray(stored)
+          ? stored
+          : []
+      );
+
+    } catch {
+
+      setTocSections([]);
+
+    }
+
+  }, [activeJournal?.id]);
+
+
+  useEffect(() => {
+
+    if (!activeJournal?.id) {
+      return;
+    }
+
+
+    const storageKey =
+      `${TOC_SECTION_STORAGE_KEY}-${activeJournal.id}`;
+
+
+    try {
+
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify(tocSections)
+      );
+
+    } catch {
+      // Ignore localStorage errors.
+    }
+
+  }, [
+    activeJournal?.id,
+    tocSections,
+  ]);
+
+
+  /* =======================================================
      RECENTLY OPENED JOURNALS
   ======================================================= */
 
@@ -836,13 +972,27 @@ export default function Journal() {
      PAGINATE TOC
   ======================================================= */
 
+  const tocItems =
+    useMemo(
+      () =>
+        buildTocItems(
+          safePoems,
+          tocSections
+        ),
+      [
+        safePoems,
+        tocSections,
+      ]
+    );
+
+
   const tocPages =
     useMemo(
       () =>
         paginateToc(
-          safePoems
+          tocItems
         ),
-      [safePoems]
+      [tocItems]
     );
 
 
@@ -1180,6 +1330,128 @@ export default function Journal() {
       />
 
     ) : null;
+
+
+  /* =======================================================
+     TABLE OF CONTENTS SECTION ACTIONS
+  ======================================================= */
+
+  function createTocSectionId() {
+
+    if (
+      typeof crypto !== 'undefined' &&
+      typeof crypto.randomUUID === 'function'
+    ) {
+
+      return crypto.randomUUID();
+
+    }
+
+
+    return `section-${Date.now()}-${Math.random()}`;
+
+  }
+
+
+  function addTocSection(
+    afterPoemIndex = -1
+  ) {
+
+    if (!canEdit) {
+      return;
+    }
+
+
+    const title =
+      window.prompt(
+        'Section name',
+        'Section 1'
+      );
+
+
+    if (!title?.trim()) {
+      return;
+    }
+
+
+    const nextSection = {
+
+      id: createTocSectionId(),
+
+      title: title.trim(),
+
+      afterPoemIndex,
+
+    };
+
+
+    setTocSections((current) => [
+      ...current,
+      nextSection,
+    ]);
+
+  }
+
+
+  function editTocSection(section) {
+
+    if (!canEdit) {
+      return;
+    }
+
+
+    const title =
+      window.prompt(
+        'Section name',
+        section.title || ''
+      );
+
+
+    if (!title?.trim()) {
+      return;
+    }
+
+
+    setTocSections((current) =>
+      current.map((item) =>
+        item.id === section.id
+          ? {
+              ...item,
+              title: title.trim(),
+            }
+          : item
+      )
+    );
+
+  }
+
+
+  function deleteTocSection(sectionId) {
+
+    if (!canEdit) {
+      return;
+    }
+
+
+    const confirmed =
+      window.confirm(
+        'Remove this section from the table of contents?'
+      );
+
+
+    if (!confirmed) {
+      return;
+    }
+
+
+    setTocSections((current) =>
+      current.filter(
+        (section) =>
+          section.id !== sectionId
+      )
+    );
+
+  }
 
 
   /* =======================================================
@@ -1676,14 +1948,10 @@ export default function Journal() {
               activeJournal
             }
 
-            poems={
+            items={
               tocPages[rightTocIndex]
             }
 
-            globalStartIndex={
-              rightTocIndex *
-              TOC_ITEMS_PER_PAGE
-            }
 
             poemsLoading={
               rightTocIndex === 0
@@ -1717,6 +1985,18 @@ export default function Journal() {
               handleNewPoem
             }
 
+            onAddSection={
+              addTocSection
+            }
+
+            onEditSection={
+              editTocSection
+            }
+
+            onDeleteSection={
+              deleteTocSection
+            }
+
             isContinuation={
               rightTocIndex > 0
             }
@@ -1743,14 +2023,10 @@ export default function Journal() {
                   activeJournal
                 }
 
-                poems={
+                items={
                   tocPages[leftTocIndex]
                 }
 
-                globalStartIndex={
-                  leftTocIndex *
-                  TOC_ITEMS_PER_PAGE
-                }
 
                 poemsLoading={false}
 
@@ -1778,6 +2054,18 @@ export default function Journal() {
 
                 onNewPoem={
                   handleNewPoem
+                }
+
+                onAddSection={
+                  addTocSection
+                }
+
+                onEditSection={
+                  editTocSection
+                }
+
+                onDeleteSection={
+                  deleteTocSection
                 }
 
                 isContinuation
@@ -3068,8 +3356,7 @@ function PoemMediaPage({
 
 function TocPage({
   journal,
-  poems,
-  globalStartIndex,
+  items,
   poemsLoading,
   isOwner,
   canEdit = false,
@@ -3077,6 +3364,9 @@ function TocPage({
   onSelectPoem,
   onShare,
   onNewPoem,
+  onAddSection,
+  onEditSection,
+  onDeleteSection,
   isContinuation = false,
 }) {
 
@@ -3211,6 +3501,46 @@ function TocPage({
               </>)}
 
 
+              {/* ADD SECTION */}
+
+              {canEdit && (
+
+                <button
+
+                  type="button"
+
+                  className="toc-icon-button"
+
+                  onClick={() =>
+                    onAddSection(-1)
+                  }
+
+                  aria-label="Add section"
+
+                  title="Add section at the beginning"
+
+                >
+
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+
+                    <path
+                      d="M4 6h16M4 12h10M4 18h16"
+                    />
+
+                    <path
+                      d="M18 10v6M15 13h6"
+                    />
+
+                  </svg>
+
+                </button>
+
+              )}
+
+
               {/* NEW POEM */}
 
               {canEdit && (
@@ -3276,63 +3606,221 @@ function TocPage({
             label="Turning pages"
           />
 
-        ) : poems?.length ? (
+        ) : items?.length ? (
 
-          poems.map(
-            (
-              poem,
-              index
-            ) => (
+          items.map((item) => {
 
-              <button
+            if (item.type === 'section') {
 
-                key={
-                  poem.id
-                }
+              return (
 
-                onClick={() =>
-                  onSelectPoem(
-                    globalStartIndex +
-                    index
-                  )
-                }
+                <div
+                  key={`section-${item.section.id}`}
+                  className="toc-section-heading"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    margin: '8px 0 2px',
+                    padding: '5px 0',
+                    borderBottom: '1px solid rgba(43, 42, 39, 0.18)',
+                  }}
+                >
 
-                className="toc-item"
+                  <span
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: '10px',
+                      letterSpacing: '1.5px',
+                      textTransform: 'uppercase',
+                      color: '#77736b',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {item.section.title}
+                  </span>
 
+
+                  {canEdit && (
+
+                    <span
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        flexShrink: 0,
+                      }}
+                    >
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onEditSection(item.section)
+                        }
+                        aria-label={`Edit ${item.section.title}`}
+                        title="Edit section"
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          padding: '2px',
+                          cursor: 'pointer',
+                          color: '#77736b',
+                        }}
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="13"
+                          height="13"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.7"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L8 18l-4 1 1-4Z" />
+                        </svg>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onDeleteSection(item.section.id)
+                        }
+                        aria-label={`Delete ${item.section.title}`}
+                        title="Delete section"
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          padding: '2px',
+                          cursor: 'pointer',
+                          color: '#77736b',
+                        }}
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="13"
+                          height="13"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.7"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M4 7h16" />
+                          <path d="M10 11v6M14 11v6" />
+                          <path d="M6 7l1 13h10l1-13" />
+                          <path d="M9 7V4h6v3" />
+                        </svg>
+                      </button>
+
+                    </span>
+
+                  )}
+
+                </div>
+
+              );
+
+            }
+
+
+            const poem = item.poem;
+
+
+            return (
+
+              <div
+                key={poem.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
               >
 
-                <span>
+                <button
 
-                  {
-                    globalStartIndex +
-                    index +
-                    1
+                  onClick={() =>
+                    onSelectPoem(
+                      item.poemIndex
+                    )
                   }
 
-                  {' '}
+                  className="toc-item"
 
-                  {
-                    poem.title ||
-                    'Untitled'
-                  }
+                  style={{
+                    flex: '1 1 auto',
+                    minWidth: 0,
+                  }}
 
-                </span>
+                >
+
+                  <span>
+
+                    {item.poemIndex + 1}
+
+                    {' '}
+
+                    {poem.title || 'Untitled'}
+
+                  </span>
 
 
-                <span>
+                  <span>
 
-                  {
-                    poem.poem_date ||
-                    ''
-                  }
+                    {poem.poem_date || ''}
 
-                </span>
+                  </span>
 
-              </button>
+                </button>
 
-            )
 
-          )
+                {canEdit && (
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onAddSection(
+                        item.poemIndex
+                      )
+                    }
+                    aria-label={`Add section after ${poem.title || 'this poem'}`}
+                    title="Add section after this poem"
+                    style={{
+                      flexShrink: 0,
+                      border: 'none',
+                      background: 'transparent',
+                      padding: '4px',
+                      cursor: 'pointer',
+                      color: '#77736b',
+                      opacity: 0.7,
+                    }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="13"
+                      height="13"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                  </button>
+
+                )}
+
+              </div>
+
+            );
+
+          })
 
         ) : (
 
