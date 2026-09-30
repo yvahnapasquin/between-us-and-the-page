@@ -158,6 +158,11 @@ export default function Chat() {
     setActionFriendId,
   ] = useState(null);
 
+  const [
+    actionConfirmation,
+    setActionConfirmation,
+  ] = useState(null);
+
 
   /* =======================================================
      CLOSE FRIEND MENU WHEN CLICKING / TAPPING OUTSIDE
@@ -769,7 +774,20 @@ export default function Chat() {
      UNFRIEND
   ======================================================= */
 
-  async function handleUnfriend(
+  function handleUnfriend(
+    friend
+  ) {
+
+    setOpenFriendMenuId(null);
+    setActionConfirmation({
+      type: 'unfriend',
+      friend,
+    });
+
+  }
+
+
+  async function executeUnfriend(
     friend
   ) {
 
@@ -777,24 +795,14 @@ export default function Chat() {
       friend.pen_name?.trim() ||
       friend.friend_id;
 
-    const confirmed =
-      window.confirm(
-        `Unfriend ${friendName}?`
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
     try {
 
       setActionFriendId(
         friend.id
       );
-
+      setActionConfirmation(null);
       setError('');
       setNotice('');
-      setOpenFriendMenuId(null);
 
       await unfriendFriend(
         friend.id
@@ -842,35 +850,31 @@ export default function Chat() {
   }
 
 
-  /* =======================================================
-     DELETE CONVERSATION
-  ======================================================= */
-
-  async function handleDeleteConversation(
+  function handleDeleteConversation(
     friend
   ) {
 
-    const friendName =
-      friend.pen_name?.trim() ||
-      friend.friend_id;
+    setOpenFriendMenuId(null);
+    setActionConfirmation({
+      type: 'delete_conversation',
+      friend,
+    });
 
-    const confirmed =
-      window.confirm(
-        `Delete your conversation with ${friendName}? This will permanently remove the messages from the conversation.`
-      );
+  }
 
-    if (!confirmed) {
-      return;
-    }
+
+  async function executeDeleteConversation(
+    friend
+  ) {
 
     try {
 
       setActionFriendId(
         friend.id
       );
+      setActionConfirmation(null);
       setError('');
       setNotice('');
-      setOpenFriendMenuId(null);
 
       await deleteConversation(
         friend.id
@@ -2673,6 +2677,179 @@ export default function Chat() {
         </section>
 
       )}
+
+      {/* ===================================================
+          FRIEND ACTION CONFIRMATION CARD
+      =================================================== */}
+
+      {actionConfirmation && (
+
+        <div
+          className="
+            fixed
+            inset-0
+            z-[100]
+            flex
+            items-center
+            justify-center
+            bg-ink/30
+            px-4
+            py-6
+            backdrop-blur-[2px]
+          "
+          onPointerDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setActionConfirmation(null);
+            }
+          }}
+        >
+
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="friend-action-title"
+            className="
+              w-full
+              max-w-md
+              rounded-xl
+              border
+              border-ink/15
+              bg-paper
+              p-5
+              text-ink
+              shadow-2xl
+            "
+          >
+
+            <p
+              className="
+                font-mono
+                text-[10px]
+                uppercase
+                tracking-[0.16em]
+                text-ink-soft
+              "
+            >
+              {actionConfirmation.type === 'unfriend'
+                ? 'Friend management'
+                : 'Conversation management'}
+            </p>
+
+            <h2
+              id="friend-action-title"
+              className="
+                mt-2
+                font-body
+                text-xl
+                font-semibold
+              "
+            >
+              {actionConfirmation.type === 'unfriend'
+                ? 'Unfriend this user?'
+                : 'Delete this conversation?'}
+            </h2>
+
+            <p
+              className="
+                mt-3
+                font-body
+                text-sm
+                leading-6
+                text-ink-soft
+              "
+            >
+              {actionConfirmation.type === 'unfriend'
+                ? `You will remove ${actionConfirmation.friend.pen_name?.trim() || actionConfirmation.friend.friend_id} from your friends. Your existing conversation will not be deleted.`
+                : `This will permanently delete the messages in your conversation with ${actionConfirmation.friend.pen_name?.trim() || actionConfirmation.friend.friend_id}. This action cannot be undone.`}
+            </p>
+
+            <div
+              className="
+                mt-5
+                flex
+                flex-col-reverse
+                gap-2
+                sm:flex-row
+                sm:justify-end
+              "
+            >
+
+              <button
+                type="button"
+                onClick={() =>
+                  setActionConfirmation(null)
+                }
+                disabled={
+                  actionFriendId ===
+                  actionConfirmation.friend.id
+                }
+                className="
+                  rounded-md
+                  border
+                  border-ink/20
+                  bg-paper
+                  px-4
+                  py-2.5
+                  font-mono
+                  text-xs
+                  uppercase
+                  tracking-wide
+                  text-ink
+                  transition
+                  hover:bg-ink/5
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
+                "
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (actionConfirmation.type === 'unfriend') {
+                    executeUnfriend(actionConfirmation.friend);
+                  } else {
+                    executeDeleteConversation(actionConfirmation.friend);
+                  }
+                }}
+                disabled={
+                  actionFriendId ===
+                  actionConfirmation.friend.id
+                }
+                className="
+                  rounded-md
+                  border
+                  border-ink
+                  bg-ink
+                  px-4
+                  py-2.5
+                  font-mono
+                  text-xs
+                  uppercase
+                  tracking-wide
+                  text-paper
+                  transition
+                  hover:opacity-90
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
+                "
+              >
+                {actionFriendId === actionConfirmation.friend.id
+                  ? 'Please wait…'
+                  : actionConfirmation.type === 'unfriend'
+                    ? 'Unfriend'
+                    : 'Delete conversation'}
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
 
     </div>
 
