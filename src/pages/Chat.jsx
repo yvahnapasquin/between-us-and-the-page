@@ -14,6 +14,8 @@ import {
   getFriends,
   getMessages,
   getMyProfile,
+  deleteConversation,
+  unfriendFriend,
   markAllChatsRead,
   searchUserByFriendId,
   sendFriendRequest,
@@ -143,6 +145,46 @@ export default function Chat() {
     notice,
     setNotice,
   ] = useState('');
+
+
+  const [
+    openFriendMenuId,
+    setOpenFriendMenuId,
+  ] = useState(null);
+
+
+  const [
+    actionFriendId,
+    setActionFriendId,
+  ] = useState(null);
+
+
+  /* =======================================================
+     CLOSE FRIEND MENU WHEN CLICKING / TAPPING OUTSIDE
+  ======================================================= */
+
+  useEffect(() => {
+    function handleOutsideFriendMenu(event) {
+      const clickedInsideFriendMenu =
+        event.target.closest?.('[data-friend-menu]');
+
+      if (!clickedInsideFriendMenu) {
+        setOpenFriendMenuId(null);
+      }
+    }
+
+    document.addEventListener(
+      'pointerdown',
+      handleOutsideFriendMenu
+    );
+
+    return () => {
+      document.removeEventListener(
+        'pointerdown',
+        handleOutsideFriendMenu
+      );
+    };
+  }, []);
 
 
   function getFriendlyChatError(
@@ -717,6 +759,151 @@ export default function Chat() {
       setSendingMessage(
         false
       );
+
+    }
+
+  }
+
+
+  /* =======================================================
+     UNFRIEND
+  ======================================================= */
+
+  async function handleUnfriend(
+    friend
+  ) {
+
+    const friendName =
+      friend.pen_name?.trim() ||
+      friend.friend_id;
+
+    const confirmed =
+      window.confirm(
+        `Unfriend ${friendName}?`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+
+      setActionFriendId(
+        friend.id
+      );
+
+      setError('');
+      setNotice('');
+      setOpenFriendMenuId(null);
+
+      await unfriendFriend(
+        friend.id
+      );
+
+      setFriends(
+        (current) =>
+          current.filter(
+            (item) =>
+              item.id !== friend.id
+          )
+      );
+
+      if (
+        selectedFriend?.id ===
+        friend.id
+      ) {
+        setSelectedFriend(null);
+        setMessages([]);
+      }
+
+      setNotice(
+        `${friendName} has been removed from your friends.`
+      );
+
+    } catch (err) {
+
+      console.error(
+        err
+      );
+
+      setError(
+        getFriendlyChatError(
+          err,
+          'Could not unfriend this person.'
+        )
+      );
+
+    } finally {
+
+      setActionFriendId(null);
+
+    }
+
+  }
+
+
+  /* =======================================================
+     DELETE CONVERSATION
+  ======================================================= */
+
+  async function handleDeleteConversation(
+    friend
+  ) {
+
+    const friendName =
+      friend.pen_name?.trim() ||
+      friend.friend_id;
+
+    const confirmed =
+      window.confirm(
+        `Delete your conversation with ${friendName}? This will permanently remove the messages from the conversation.`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+
+      setActionFriendId(
+        friend.id
+      );
+      setError('');
+      setNotice('');
+      setOpenFriendMenuId(null);
+
+      await deleteConversation(
+        friend.id
+      );
+
+      if (
+        selectedFriend?.id ===
+        friend.id
+      ) {
+        setMessages([]);
+        shouldScrollToBottomRef.current = false;
+      }
+
+      setNotice(
+        'Conversation deleted.'
+      );
+
+    } catch (err) {
+
+      console.error(
+        err
+      );
+
+      setError(
+        getFriendlyChatError(
+          err,
+          'Could not delete the conversation.'
+        )
+      );
+
+    } finally {
+
+      setActionFriendId(null);
 
     }
 
@@ -1902,49 +2089,218 @@ export default function Chat() {
 
 
               {friends.map(
-                (friend) => (
+                (friend) => {
 
-                  <button
-                    key={
-                      friend.id
-                    }
-                    type="button"
-                    onClick={() =>
-                      handleSelectFriend(
-                        friend
-                      )
-                    }
-                    className={`
-                      w-full
-                      rounded-lg
-                      border
-                      px-3
-                      py-3
-                      text-left
-                      transition
-                      ${
-                        selectedFriend?.id ===
+                  const isSelected =
+                    selectedFriend?.id ===
+                    friend.id;
+
+                  const menuOpen =
+                    openFriendMenuId ===
+                    friend.id;
+
+                  const actionLoading =
+                    actionFriendId ===
+                    friend.id;
+
+                  return (
+
+                    <div
+                      key={
                         friend.id
-                          ? 'border-ink bg-ink text-paper'
-                          : 'border-ink/10 hover:border-ink/30'
                       }
-                    `}
-                  >
-
-                    <p
-                      className="
-                        font-mono
-                        text-sm
-                      "
+                      data-friend-menu
+                      className={`
+                        relative
+                        w-full
+                        rounded-lg
+                        border
+                        transition
+                        ${
+                          isSelected
+                            ? 'border-ink bg-ink text-paper'
+                            : 'border-ink/10 bg-paper hover:border-ink/30'
+                        }
+                      `}
                     >
-                      {friend.pen_name?.trim() || friend.friend_id}
-                    </p>
 
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleSelectFriend(
+                            friend
+                          )
+                        }
+                        className="
+                          w-full
+                          rounded-lg
+                          px-3
+                          py-3
+                          pr-12
+                          text-left
+                        "
+                      >
 
+                        <p
+                          className="
+                            font-mono
+                            text-sm
+                          "
+                        >
+                          {friend.pen_name?.trim() || friend.friend_id}
+                        </p>
 
-                  </button>
+                        <p
+                          className={`
+                            mt-1
+                            font-mono
+                            text-[10px]
+                            uppercase
+                            tracking-[0.12em]
+                            ${
+                              isSelected
+                                ? 'text-paper/60'
+                                : 'text-ink-soft'
+                            }
+                          `}
+                        >
+                          {friend.friend_id}
+                        </p>
 
-                )
+                      </button>
+
+                      <button
+                        type="button"
+                        aria-label={`More options for ${friend.pen_name?.trim() || friend.friend_id}`}
+                        aria-expanded={
+                          menuOpen
+                        }
+                        disabled={
+                          actionLoading
+                        }
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setOpenFriendMenuId(
+                            (current) =>
+                              current === friend.id
+                                ? null
+                                : friend.id
+                          );
+                        }}
+                        className={`
+                          absolute
+                          right-2
+                          top-2
+                          flex
+                          h-8
+                          w-8
+                          items-center
+                          justify-center
+                          rounded-md
+                          font-mono
+                          text-lg
+                          leading-none
+                          transition
+                          ${
+                            isSelected
+                              ? 'text-paper hover:bg-paper/10'
+                              : 'text-ink-soft hover:bg-ink/5 hover:text-ink'
+                          }
+                          disabled:cursor-not-allowed
+                          disabled:opacity-50
+                        `}
+                      >
+                        ⋯
+                      </button>
+
+                      {menuOpen && (
+
+                        <div
+                          className="
+                            absolute
+                            right-2
+                            top-11
+                            z-30
+                            w-48
+                            overflow-hidden
+                            rounded-lg
+                            border
+                            border-ink/15
+                            bg-paper
+                            py-1
+                            text-ink
+                            shadow-lg
+                          "
+                          onClick={(event) =>
+                            event.stopPropagation()
+                          }
+                        >
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUnfriend(
+                                friend
+                              )
+                            }
+                            disabled={
+                              actionLoading
+                            }
+                            className="
+                              flex
+                              w-full
+                              items-center
+                              px-3
+                              py-2.5
+                              text-left
+                              font-mono
+                              text-xs
+                              transition
+                              hover:bg-ink/5
+                              disabled:cursor-not-allowed
+                              disabled:opacity-50
+                            "
+                          >
+                            Unfriend
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDeleteConversation(
+                                friend
+                              )
+                            }
+                            disabled={
+                              actionLoading
+                            }
+                            className="
+                              flex
+                              w-full
+                              items-center
+                              px-3
+                              py-2.5
+                              text-left
+                              font-mono
+                              text-xs
+                              transition
+                              hover:bg-ink/5
+                              disabled:cursor-not-allowed
+                              disabled:opacity-50
+                            "
+                          >
+                            Delete conversation
+                          </button>
+
+                        </div>
+
+                      )}
+
+                    </div>
+
+                  );
+
+                }
               )}
 
             </div>

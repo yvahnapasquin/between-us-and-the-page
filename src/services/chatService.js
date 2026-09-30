@@ -807,3 +807,81 @@ export async function markAllChatsRead() {
 
   return data || [];
 }
+
+
+/* =========================================================
+   UNFRIEND
+   ---------------------------------------------------------
+   The database function verifies that the current user is one
+   of the two people in the accepted friendship before removing
+   it. Chat read-state rows for the friendship are removed too.
+========================================================= */
+
+export async function unfriendFriend(
+  friendId
+) {
+  const user =
+    await getCurrentUser();
+
+  if (friendId === user.id) {
+    throw new Error(
+      'You cannot unfriend yourself.'
+    );
+  }
+
+  const {
+    data,
+    error,
+  } = await supabase.rpc(
+    'unfriend_friend',
+    {
+      p_friend_id:
+        friendId,
+    }
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+
+/* =========================================================
+   DELETE CONVERSATION
+   ---------------------------------------------------------
+   Permanently removes messages between the current user and
+   the selected friend. The database function verifies that
+   the current user is one of the two participants.
+========================================================= */
+
+export async function deleteConversation(
+  friendId
+) {
+  const user =
+    await getCurrentUser();
+
+  if (friendId === user.id) {
+    throw new Error(
+      'Invalid conversation.'
+    );
+  }
+
+  const {
+    data,
+    error,
+  } = await supabase.rpc(
+    'delete_chat_conversation',
+    {
+      p_friend_id:
+        friendId,
+    }
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
