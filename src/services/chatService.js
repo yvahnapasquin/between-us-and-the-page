@@ -6,20 +6,27 @@ import { supabase } from './supabase';
 ========================================================= */
 
 async function getCurrentUser() {
+
   const {
     data,
     error,
   } = await supabase.auth.getUser();
 
+
   if (error) {
     throw error;
   }
 
+
   if (!data.user) {
-    throw new Error('You must be signed in.');
+    throw new Error(
+      'You must be signed in.'
+    );
   }
 
+
   return data.user;
+
 }
 
 
@@ -28,8 +35,10 @@ async function getCurrentUser() {
 ========================================================= */
 
 export async function getMyProfile() {
+
   const user =
     await getCurrentUser();
+
 
   const {
     data,
@@ -37,7 +46,7 @@ export async function getMyProfile() {
   } = await supabase
     .from('profiles')
     .select(
-      'id, friend_id, email'
+      'id, friend_id, email, pen_name'
     )
     .eq(
       'id',
@@ -45,11 +54,14 @@ export async function getMyProfile() {
     )
     .single();
 
+
   if (error) {
     throw error;
   }
 
+
   return data;
+
 }
 
 
@@ -60,17 +72,21 @@ export async function getMyProfile() {
 export async function searchUserByFriendId(
   friendId
 ) {
+
   const user =
     await getCurrentUser();
+
 
   const cleanId =
     friendId
       .trim()
       .toUpperCase();
 
+
   if (!cleanId) {
     return null;
   }
+
 
   const {
     data,
@@ -78,7 +94,7 @@ export async function searchUserByFriendId(
   } = await supabase
     .from('profiles')
     .select(
-      'id, friend_id, email'
+      'id, friend_id, email, pen_name'
     )
     .eq(
       'friend_id',
@@ -90,11 +106,14 @@ export async function searchUserByFriendId(
     )
     .maybeSingle();
 
+
   if (error) {
     throw error;
   }
 
+
   return data;
+
 }
 
 
@@ -105,8 +124,10 @@ export async function searchUserByFriendId(
 export async function sendFriendRequest(
   recipientId
 ) {
+
   const user =
     await getCurrentUser();
+
 
   const {
     data,
@@ -114,20 +135,28 @@ export async function sendFriendRequest(
   } = await supabase
     .from('friend_requests')
     .insert({
-      requester_id: user.id,
-      recipient_id: recipientId,
-      status: 'pending',
+      requester_id:
+        user.id,
+
+      recipient_id:
+        recipientId,
+
+      status:
+        'pending',
     })
     .select(
       'id, requester_id, recipient_id, status, created_at'
     )
     .single();
 
+
   if (error) {
     throw error;
   }
 
+
   return data;
+
 }
 
 
@@ -136,8 +165,10 @@ export async function sendFriendRequest(
 ========================================================= */
 
 export async function getFriendRequests() {
+
   const user =
     await getCurrentUser();
+
 
   const {
     data,
@@ -158,13 +189,16 @@ export async function getFriendRequests() {
     .order(
       'created_at',
       {
-        ascending: false,
+        ascending:
+          false,
       }
     );
+
 
   if (error) {
     throw error;
   }
+
 
   const requesterIds =
     (data || []).map(
@@ -172,9 +206,11 @@ export async function getFriendRequests() {
         request.requester_id
     );
 
+
   if (!requesterIds.length) {
     return [];
   }
+
 
   const {
     data: profiles,
@@ -182,16 +218,18 @@ export async function getFriendRequests() {
   } = await supabase
     .from('profiles')
     .select(
-      'id, friend_id, email'
+      'id, friend_id, email, pen_name'
     )
     .in(
       'id',
       requesterIds
     );
 
+
   if (profileError) {
     throw profileError;
   }
+
 
   const profileMap =
     new Map(
@@ -203,15 +241,18 @@ export async function getFriendRequests() {
       )
     );
 
+
   return (data || []).map(
     (request) => ({
       ...request,
+
       requester:
         profileMap.get(
           request.requester_id
         ) || null,
     })
   );
+
 }
 
 
@@ -223,8 +264,10 @@ export async function updateFriendRequest(
   requestId,
   status
 ) {
+
   const user =
     await getCurrentUser();
+
 
   const {
     data,
@@ -247,11 +290,14 @@ export async function updateFriendRequest(
     )
     .single();
 
+
   if (error) {
     throw error;
   }
 
+
   return data;
+
 }
 
 
@@ -260,8 +306,10 @@ export async function updateFriendRequest(
 ========================================================= */
 
 export async function getFriends() {
+
   const user =
     await getCurrentUser();
+
 
   const {
     data,
@@ -281,13 +329,16 @@ export async function getFriends() {
     .order(
       'created_at',
       {
-        ascending: false,
+        ascending:
+          false,
       }
     );
+
 
   if (error) {
     throw error;
   }
+
 
   const friendIds =
     (data || []).map(
@@ -297,9 +348,11 @@ export async function getFriends() {
           : request.requester_id
     );
 
+
   if (!friendIds.length) {
     return [];
   }
+
 
   const {
     data: profiles,
@@ -307,16 +360,18 @@ export async function getFriends() {
   } = await supabase
     .from('profiles')
     .select(
-      'id, friend_id, email'
+      'id, friend_id, email, pen_name'
     )
     .in(
       'id',
       friendIds
     );
 
+
   if (profileError) {
     throw profileError;
   }
+
 
   const profileMap =
     new Map(
@@ -328,6 +383,7 @@ export async function getFriends() {
       )
     );
 
+
   return (data || [])
     .map(
       (request) => {
@@ -337,14 +393,17 @@ export async function getFriends() {
             ? request.recipient_id
             : request.requester_id;
 
+
         return (
           profileMap.get(
             friendId
           ) || null
         );
+
       }
     )
     .filter(Boolean);
+
 }
 
 
@@ -355,8 +414,10 @@ export async function getFriends() {
 export async function getMessages(
   friendId
 ) {
+
   const user =
     await getCurrentUser();
+
 
   const {
     data,
@@ -372,15 +433,19 @@ export async function getMessages(
     .order(
       'created_at',
       {
-        ascending: true,
+        ascending:
+          true,
       }
     );
+
 
   if (error) {
     throw error;
   }
 
+
   return data || [];
+
 }
 
 
@@ -392,15 +457,19 @@ export async function sendMessage(
   friendId,
   content
 ) {
+
   const user =
     await getCurrentUser();
+
 
   const cleanContent =
     content.trim();
 
+
   if (!cleanContent) {
     return null;
   }
+
 
   const {
     data,
@@ -408,57 +477,28 @@ export async function sendMessage(
   } = await supabase
     .from('messages')
     .insert({
-      sender_id: user.id,
-      receiver_id: friendId,
-      content: cleanContent,
+      sender_id:
+        user.id,
+
+      receiver_id:
+        friendId,
+
+      content:
+        cleanContent,
     })
     .select(
       'id, sender_id, receiver_id, content, created_at'
     )
     .single();
 
+
   if (error) {
     throw error;
   }
+
 
   return data;
-}
 
-
-/* =========================================================
-   GET CHAT READ STATES
-========================================================= */
-
-async function getChatReadStates(
-  userId,
-  friendIds
-) {
-  if (!friendIds.length) {
-    return [];
-  }
-
-  const {
-    data,
-    error,
-  } = await supabase
-    .from('chat_read_state')
-    .select(
-      'friend_id, last_read_at'
-    )
-    .eq(
-      'user_id',
-      userId
-    )
-    .in(
-      'friend_id',
-      friendIds
-    );
-
-  if (error) {
-    throw error;
-  }
-
-  return data || [];
 }
 
 
@@ -467,92 +507,71 @@ async function getChatReadStates(
 ========================================================= */
 
 export async function getChatNotifications() {
+
   const user =
     await getCurrentUser();
 
-  const [
-    friendRequestsResult,
-    messagesResult,
-  ] = await Promise.all([
-    supabase
-      .from('friend_requests')
-      .select(
-        'id, requester_id, created_at'
-      )
-      .eq(
-        'recipient_id',
-        user.id
-      )
-      .eq(
-        'status',
-        'pending'
-      )
-      .order(
-        'created_at',
-        {
-          ascending: false,
-        }
-      ),
-
-    supabase
-      .from('messages')
-      .select(
-        'id, sender_id, content, created_at'
-      )
-      .eq(
-        'receiver_id',
-        user.id
-      )
-      .order(
-        'created_at',
-        {
-          ascending: false,
-        }
-      ),
-  ]);
-
-  if (friendRequestsResult.error) {
-    throw friendRequestsResult.error;
-  }
-
-  if (messagesResult.error) {
-    throw messagesResult.error;
-  }
-
-  const requests =
-    friendRequestsResult.data || [];
-
-  const messages =
-    messagesResult.data || [];
-
 
   /* -------------------------------------------------------
-     FIND WHO SENT MESSAGES
+     FRIEND REQUESTS
   ------------------------------------------------------- */
 
-  const messageSenderIds = [
-    ...new Set(
-      messages.map(
-        (message) =>
-          message.sender_id
-      )
-    ),
-  ];
-
-
-  /* -------------------------------------------------------
-     GET LAST READ TIMES
-  ------------------------------------------------------- */
-
-  const readStates =
-    await getChatReadStates(
-      user.id,
-      messageSenderIds
+  const {
+    data: friendRequests,
+    error: requestError,
+  } = await supabase
+    .from('friend_requests')
+    .select(
+      'id, requester_id, recipient_id, status, created_at'
+    )
+    .eq(
+      'recipient_id',
+      user.id
+    )
+    .eq(
+      'status',
+      'pending'
+    )
+    .order(
+      'created_at',
+      {
+        ascending:
+          false,
+      }
     );
 
-  const readMap =
+
+  if (requestError) {
+    throw requestError;
+  }
+
+
+  /* -------------------------------------------------------
+     READ STATES
+  ------------------------------------------------------- */
+
+  const {
+    data: readStates,
+    error: readStateError,
+  } = await supabase
+    .from('chat_read_state')
+    .select(
+      'friend_id, last_read_at'
+    )
+    .eq(
+      'user_id',
+      user.id
+    );
+
+
+  if (readStateError) {
+    throw readStateError;
+  }
+
+
+  const readStateMap =
     new Map(
-      readStates.map(
+      (readStates || []).map(
         (state) => [
           state.friend_id,
           state.last_read_at,
@@ -562,21 +581,49 @@ export async function getChatNotifications() {
 
 
   /* -------------------------------------------------------
-     FIND UNREAD MESSAGES
+     UNREAD MESSAGES
   ------------------------------------------------------- */
 
-  const unreadMessages =
-    messages.filter(
+  const {
+    data: unreadMessages,
+    error: messageError,
+  } = await supabase
+    .from('messages')
+    .select(
+      'id, sender_id, receiver_id, content, created_at'
+    )
+    .eq(
+      'receiver_id',
+      user.id
+    )
+    .order(
+      'created_at',
+      {
+        ascending:
+          false,
+      }
+    );
+
+
+  if (messageError) {
+    throw messageError;
+  }
+
+
+  const filteredUnreadMessages =
+    (unreadMessages || []).filter(
       (message) => {
 
         const lastReadAt =
-          readMap.get(
+          readStateMap.get(
             message.sender_id
           );
+
 
         if (!lastReadAt) {
           return true;
         }
+
 
         return (
           new Date(
@@ -586,30 +633,44 @@ export async function getChatNotifications() {
             lastReadAt
           ).getTime()
         );
+
       }
     );
 
 
   /* -------------------------------------------------------
-     GET PROFILE INFORMATION
+     COLLECT PROFILE IDS
   ------------------------------------------------------- */
 
   const profileIds = [
-    ...new Set([
-      ...requests.map(
-        (request) =>
-          request.requester_id
-      ),
-      ...unreadMessages.map(
-        (message) =>
-          message.sender_id
-      ),
-    ]),
+
+    ...(friendRequests || []).map(
+      (request) =>
+        request.requester_id
+    ),
+
+    ...filteredUnreadMessages.map(
+      (message) =>
+        message.sender_id
+    ),
+
   ];
+
+
+  const uniqueProfileIds =
+    [
+      ...new Set(
+        profileIds
+      ),
+    ];
+
 
   let profiles = [];
 
-  if (profileIds.length) {
+
+  if (
+    uniqueProfileIds.length
+  ) {
 
     const {
       data,
@@ -617,19 +678,22 @@ export async function getChatNotifications() {
     } = await supabase
       .from('profiles')
       .select(
-        'id, friend_id, email'
+        'id, friend_id, email, pen_name'
       )
       .in(
         'id',
-        profileIds
+        uniqueProfileIds
       );
+
 
     if (error) {
       throw error;
     }
 
+
     profiles =
       data || [];
+
   }
 
 
@@ -645,15 +709,16 @@ export async function getChatNotifications() {
 
 
   /* -------------------------------------------------------
-     BUILD NOTIFICATIONS
+     COMBINE NOTIFICATIONS
   ------------------------------------------------------- */
 
   const notifications = [
 
-    ...requests.map(
+    ...(friendRequests || []).map(
       (request) => ({
+
         id:
-          `friend-request-${request.id}`,
+          `request-${request.id}`,
 
         type:
           'friend_request',
@@ -668,11 +733,14 @@ export async function getChatNotifications() {
 
         requestId:
           request.id,
+
       })
     ),
 
-    ...unreadMessages.map(
+
+    ...filteredUnreadMessages.map(
       (message) => ({
+
         id:
           `message-${message.id}`,
 
@@ -695,15 +763,12 @@ export async function getChatNotifications() {
 
         preview:
           message.content,
+
       })
     ),
 
   ];
 
-
-  /* -------------------------------------------------------
-     NEWEST FIRST
-  ------------------------------------------------------- */
 
   notifications.sort(
     (a, b) =>
@@ -717,6 +782,7 @@ export async function getChatNotifications() {
 
 
   return notifications;
+
 }
 
 
@@ -729,7 +795,9 @@ export async function getNotificationCount() {
   const notifications =
     await getChatNotifications();
 
+
   return notifications.length;
+
 }
 
 
@@ -740,8 +808,10 @@ export async function getNotificationCount() {
 export async function markChatRead(
   friendId
 ) {
+
   const user =
     await getCurrentUser();
+
 
   const {
     error,
@@ -764,9 +834,11 @@ export async function markChatRead(
       }
     );
 
+
   if (error) {
     throw error;
   }
+
 }
 
 
@@ -777,19 +849,24 @@ export async function markChatRead(
 export async function markAllChatsRead(
   friendIds
 ) {
+
   const user =
     await getCurrentUser();
+
 
   if (!friendIds.length) {
     return;
   }
 
+
   const now =
     new Date().toISOString();
+
 
   const rows =
     friendIds.map(
       (friendId) => ({
+
         user_id:
           user.id,
 
@@ -798,8 +875,10 @@ export async function markAllChatsRead(
 
         last_read_at:
           now,
+
       })
     );
+
 
   const {
     error,
@@ -813,7 +892,9 @@ export async function markAllChatsRead(
       }
     );
 
+
   if (error) {
     throw error;
   }
+
 }

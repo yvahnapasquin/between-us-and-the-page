@@ -247,6 +247,24 @@ export default function UserProfileSidebar({
       }
 
 
+      const { error: profileError } =
+        await supabase
+          .from('profiles')
+          .update({
+            pen_name:
+              trimmedPenName || null,
+          })
+          .eq(
+            'id',
+            user.id
+          );
+
+
+      if (profileError) {
+        throw profileError;
+      }
+
+
       setPenName(trimmedPenName);
       setSaveMessage('Saved');
 

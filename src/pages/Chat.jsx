@@ -1037,9 +1037,8 @@ export default function Chat() {
                 (notification) => {
 
                   const source =
-                    notification
-                      .profile
-                      ?.friend_id ||
+                    notification.profile?.pen_name?.trim() ||
+                    notification.profile?.friend_id ||
                     'Unknown user';
 
 
@@ -1588,9 +1587,21 @@ export default function Chat() {
 
                 <p
                   className="
+                    font-display
+                    text-lg
+                    text-ink
+                  "
+                >
+                  {searchResult.pen_name?.trim() || searchResult.friend_id}
+                </p>
+
+                <p
+                  className="
+                    mt-1
                     font-mono
-                    text-sm
+                    text-xs
                     tracking-wide
+                    text-ink-soft
                   "
                 >
                   {searchResult.friend_id}
@@ -1744,10 +1755,7 @@ export default function Chat() {
                         text-sm
                       "
                     >
-                      {
-                        request.requester
-                          ?.friend_id
-                      }
+                      {request.requester?.pen_name?.trim() || request.requester?.friend_id}
                     </p>
 
 
@@ -1952,7 +1960,7 @@ export default function Chat() {
                         text-sm
                       "
                     >
-                      {friend.friend_id}
+                      {friend.pen_name?.trim() || friend.friend_id}
                     </p>
 
 
@@ -2040,7 +2048,7 @@ export default function Chat() {
                 text-xl
               "
             >
-              {selectedFriend.friend_id}
+              {selectedFriend.pen_name?.trim() || selectedFriend.friend_id}
             </h2>
 
 
