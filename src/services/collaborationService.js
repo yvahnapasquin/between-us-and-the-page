@@ -6,14 +6,11 @@ import { supabase } from './supabase';
 ========================================================= */
 
 export async function getMyCollaborationSpaces() {
-
   const {
     data,
     error,
   } = await supabase
-
     .from('collaboration_space_members')
-
     .select(`
       space_id,
       role,
@@ -25,26 +22,28 @@ export async function getMyCollaborationSpaces() {
         created_at
       )
     `)
-
     .order(
       'created_at',
       {
         ascending: false,
-        foreignTable: 'collaboration_spaces',
+        foreignTable:
+          'collaboration_spaces',
       }
     );
-
 
   if (error) {
     throw error;
   }
 
-
   return (data || [])
-    .map((item) => ({
-      ...item.collaboration_spaces,
-      my_role: item.role,
-    }))
+    .map(
+      (item) => ({
+        ...item.collaboration_spaces,
+
+        my_role:
+          item.role,
+      })
+    )
     .filter(Boolean);
 }
 
@@ -57,7 +56,6 @@ export async function createCollaborationSpace(
   name,
   description
 ) {
-
   const {
     data,
     error,
@@ -72,11 +70,9 @@ export async function createCollaborationSpace(
     }
   );
 
-
   if (error) {
     throw error;
   }
-
 
   return data;
 }
@@ -89,20 +85,20 @@ export async function createCollaborationSpace(
 export async function deleteCollaborationSpace(
   spaceId
 ) {
-
   const {
     data,
     error,
   } = await supabase
     .from('collaboration_spaces')
     .delete()
-    .eq('id', spaceId);
-
+    .eq(
+      'id',
+      spaceId
+    );
 
   if (error) {
     throw error;
   }
-
 
   return data;
 }
@@ -115,20 +111,20 @@ export async function deleteCollaborationSpace(
 export async function leaveCollaborationSpace(
   spaceId
 ) {
-
   const {
     data,
     error,
   } = await supabase
     .from('collaboration_space_members')
     .delete()
-    .eq('space_id', spaceId);
-
+    .eq(
+      'space_id',
+      spaceId
+    );
 
   if (error) {
     throw error;
   }
-
 
   return data;
 }
@@ -136,74 +132,56 @@ export async function leaveCollaborationSpace(
 
 /* =========================================================
    GET MEMBERS
+   ---------------------------------------------------------
+   Uses a protected database function because the profiles
+   table is no longer directly readable by other users.
 ========================================================= */
 
-export async function getCollaborationMembers(spaceId) {
+export async function getCollaborationMembers(
+  spaceId
+) {
+  const {
+    data,
+    error,
+  } = await supabase.rpc(
+    'get_collaboration_members_with_profiles',
+    {
+      p_space_id:
+        spaceId,
+    }
+  );
 
-  const { data: members, error: membersError } =
-    await supabase
-      .from('collaboration_space_members')
-      .select(`
-        space_id,
-        user_id,
-        role,
-        joined_at
-      `)
-      .eq('space_id', spaceId)
-      .order('joined_at', {
-        ascending: true,
-      });
-
-
-  if (membersError) {
-    throw membersError;
+  if (error) {
+    throw error;
   }
 
+  return (data || [])
+    .map(
+      (member) => ({
+        space_id:
+          member.space_id,
 
-  if (!members || members.length === 0) {
-    return [];
-  }
+        user_id:
+          member.user_id,
 
+        role:
+          member.role,
 
-  const userIds =
-    members.map(
-      (member) => member.user_id
+        joined_at:
+          member.joined_at,
+
+        profile: {
+          id:
+            member.user_id,
+
+          friend_id:
+            member.friend_id,
+
+          email:
+            member.email,
+        },
+      })
     );
-
-
-  const { data: profiles, error: profilesError } =
-    await supabase
-      .from('profiles')
-      .select(`
-        id,
-        friend_id,
-        email
-      `)
-      .in('id', userIds);
-
-
-  if (profilesError) {
-    throw profilesError;
-  }
-
-
-  const profileMap =
-    new Map(
-      (profiles || []).map(
-        (profile) => [
-          profile.id,
-          profile,
-        ]
-      )
-    );
-
-
-  return members.map((member) => ({
-    ...member,
-    profile:
-      profileMap.get(member.user_id) || null,
-  }));
-
 }
 
 
@@ -215,7 +193,6 @@ export async function addCollaborationMember(
   spaceId,
   friendId
 ) {
-
   const {
     data,
     error,
@@ -232,11 +209,9 @@ export async function addCollaborationMember(
     }
   );
 
-
   if (error) {
     throw error;
   }
-
 
   return data;
 }
@@ -250,7 +225,6 @@ export async function removeCollaborationMember(
   spaceId,
   userId
 ) {
-
   const {
     data,
     error,
@@ -265,11 +239,9 @@ export async function removeCollaborationMember(
     }
   );
 
-
   if (error) {
     throw error;
   }
-
 
   return data;
 }
@@ -282,14 +254,11 @@ export async function removeCollaborationMember(
 export async function getCollaborationBooks(
   spaceId
 ) {
-
   const {
     data,
     error,
   } = await supabase
-
     .from('collaboration_books')
-
     .select(`
       id,
       space_id,
@@ -300,12 +269,10 @@ export async function getCollaborationBooks(
         *
       )
     `)
-
     .eq(
       'space_id',
       spaceId
     )
-
     .order(
       'created_at',
       {
@@ -313,22 +280,22 @@ export async function getCollaborationBooks(
       }
     );
 
-
   if (error) {
     throw error;
   }
 
-
   return (data || [])
-    .map((book) => ({
-      ...book.journals,
+    .map(
+      (book) => ({
+        ...book.journals,
 
-      collaboration_book_id:
-        book.id,
+        collaboration_book_id:
+          book.id,
 
-      created_by:
-        book.created_by,
-    }))
+        created_by:
+          book.created_by,
+      })
+    )
     .filter(Boolean);
 }
 
@@ -347,7 +314,6 @@ export async function createCollaborationBook({
   coverMaterial,
   spineColor,
 }) {
-
   const {
     data,
     error,
@@ -380,37 +346,27 @@ export async function createCollaborationBook({
     }
   );
 
-
   if (error) {
     throw error;
   }
-
 
   return data;
 }
 
 
 /* =========================================================
-   ADD AN EXISTING JOURNAL TO A COLLABORATION
-   ---------------------------------------------------------
-   Reuses the existing journal record instead of creating
-   a duplicate journal.
-
-   Authorization and insertion are handled by the secure
-   database RPC.
+   ADD EXISTING JOURNAL TO A COLLABORATION
 ========================================================= */
 
 export async function addExistingJournalToCollaboration({
   spaceId,
   journalId,
 }) {
-
   if (!spaceId || !journalId) {
     throw new Error(
       'A collaboration and journal are required.'
     );
   }
-
 
   const {
     data,
@@ -426,11 +382,9 @@ export async function addExistingJournalToCollaboration({
     }
   );
 
-
   if (error) {
     throw error;
   }
-
 
   return data;
 }
@@ -444,7 +398,6 @@ export async function removeCollaborationBook(
   spaceId,
   journalId
 ) {
-
   const {
     data,
     error,
@@ -459,11 +412,9 @@ export async function removeCollaborationBook(
     }
   );
 
-
   if (error) {
     throw error;
   }
-
 
   return data;
 }

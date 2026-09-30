@@ -1608,16 +1608,6 @@ export default function Chat() {
                 </p>
 
 
-                <p
-                  className="
-                    mt-1
-                    break-all
-                    text-xs
-                    text-ink-soft
-                  "
-                >
-                  {searchResult.email}
-                </p>
 
 
                 <button
@@ -1759,19 +1749,6 @@ export default function Chat() {
                     </p>
 
 
-                    <p
-                      className="
-                        mt-1
-                        break-all
-                        text-xs
-                        text-ink-soft
-                      "
-                    >
-                      {
-                        request.requester
-                          ?.email
-                      }
-                    </p>
 
 
                     <div
@@ -1964,21 +1941,6 @@ export default function Chat() {
                     </p>
 
 
-                    <p
-                      className={`
-                        mt-1
-                        break-all
-                        text-xs
-                        ${
-                          selectedFriend?.id ===
-                          friend.id
-                            ? 'text-paper/70'
-                            : 'text-ink-soft'
-                        }
-                      `}
-                    >
-                      {friend.email}
-                    </p>
 
                   </button>
 
@@ -2052,16 +2014,6 @@ export default function Chat() {
             </h2>
 
 
-            <p
-              className="
-                mt-1
-                break-all
-                text-xs
-                text-ink-soft
-              "
-            >
-              {selectedFriend.email}
-            </p>
 
           </div>
 
