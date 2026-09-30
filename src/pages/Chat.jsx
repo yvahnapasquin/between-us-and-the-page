@@ -108,6 +108,16 @@ export default function Chat() {
 
 
   /* =======================================================
+     COLLAPSIBLE USER ID (DESKTOP ONLY)
+  ======================================================= */
+
+  const [
+    showDesktopUserId,
+    setShowDesktopUserId,
+  ] = useState(false);
+
+
+  /* =======================================================
      STATES
   ======================================================= */
 
@@ -992,6 +1002,7 @@ export default function Chat() {
         mx-auto
         max-w-5xl
         px-4
+        lg:max-w-7xl
         py-6
         sm:px-6
         sm:py-10
@@ -1004,63 +1015,40 @@ export default function Chat() {
 
       <div
         className="
-          mb-8
+          mb-6
           flex
           flex-col
           items-stretch
-          justify-between
-          gap-5
+          gap-4
+          sm:mb-8
           sm:flex-row
           sm:items-start
+          sm:justify-between
           sm:gap-6
+          lg:mb-4
+          lg:items-center
+          lg:gap-4
         "
       >
 
-        <div>
-
-          <p
-            className="
-              font-mono
-              text-xs
-              uppercase
-              tracking-[0.18em]
-              text-ink-soft
-            "
-          >
-            Messages
-          </p>
-
+        <div className="min-w-0">
 
           <h1
             className="
-              mt-2
               font-display
               text-3xl
+              lg:text-2xl
             "
           >
             Chat
           </h1>
 
-
-          <p
-            className="
-              mt-2
-              max-w-2xl
-              font-body
-              text-sm
-              leading-6
-              text-ink-soft
-            "
-          >
-            Add friends using their unique
-            user ID, then message them here.
-          </p>
-
         </div>
 
 
         {/* =================================================
-            MY USER ID
+            MY USER ID — MOBILE / TABLET
+            Desktop version lives above the left controls.
         ================================================= */}
 
         {profile && (
@@ -1076,6 +1064,7 @@ export default function Chat() {
               bg-paper/70
               p-4
               sm:max-w-sm
+              lg:hidden
             "
           >
 
@@ -1092,11 +1081,7 @@ export default function Chat() {
             </p>
 
 
-            <div
-              className="
-                mt-2
-              "
-            >
+            <div className="mt-2">
 
               <p
                 className="
@@ -1130,7 +1115,6 @@ export default function Chat() {
         )}
 
       </div>
-
 
       {/* ===================================================
           NOTIFICATIONS
@@ -1445,12 +1429,160 @@ export default function Chat() {
 
 
       {/* ===================================================
+          DESKTOP CHAT LAYOUT
+          ---------------------------------------------------
+          On desktop/laptop only, the friend controls live
+          on the LEFT and the chat remains in the main area.
+          Mobile/tablet layout remains unchanged.
+      =================================================== */}
+
+      <div
+        className="
+          lg:grid
+          lg:grid-cols-[280px_minmax(0,1fr)]
+          lg:items-start
+          lg:min-h-0
+          lg:gap-6
+        "
+      >
+
+      {/* ===================================================
+          DESKTOP USER ID
+          ---------------------------------------------------
+          Desktop/laptop only. Sits above the left controls
+          and can be collapsed to save space.
+      =================================================== */}
+
+      {profile && (
+
+        <div
+          className="
+            hidden
+            lg:col-start-1
+            lg:row-start-1
+            lg:mb-3
+            lg:block
+          "
+        >
+
+          <div
+            className="
+              overflow-hidden
+              rounded-xl
+              border
+              border-ink/15
+              bg-paper/70
+            "
+          >
+
+            <button
+              type="button"
+              onClick={() =>
+                setShowDesktopUserId(
+                  (current) => !current
+                )
+              }
+              aria-expanded={showDesktopUserId}
+              className="
+                flex
+                w-full
+                items-center
+                justify-between
+                gap-3
+                px-4
+                py-3
+                text-left
+                transition
+                hover:bg-ink/5
+              "
+            >
+
+              <span
+                className="
+                  font-mono
+                  text-[10px]
+                  uppercase
+                  tracking-[0.14em]
+                  text-ink-soft
+                "
+              >
+                Your user ID
+              </span>
+
+              <span
+                className="
+                  font-mono
+                  text-xs
+                  text-ink-soft
+                "
+              >
+                {showDesktopUserId ? 'Hide' : 'Show'}
+              </span>
+
+            </button>
+
+
+            {showDesktopUserId && (
+
+              <div
+                className="
+                  border-t
+                  border-ink/10
+                  px-4
+                  pb-4
+                  pt-3
+                "
+              >
+
+                <p
+                  className="
+                    break-all
+                    font-mono
+                    text-base
+                    tracking-[0.1em]
+                    text-ink
+                  "
+                >
+                  {profile.friend_id}
+                </p>
+
+                <p
+                  className="
+                    mt-1
+                    font-body
+                    text-xs
+                    leading-5
+                    text-ink-soft
+                  "
+                >
+                  Share this ID so friends can find you.
+                </p>
+
+              </div>
+
+            )}
+
+          </div>
+
+        </div>
+
+      )}
+
+
+      {/* ===================================================
           FRIEND CONTROLS
       =================================================== */}
 
       <section
         className="
           mb-6
+          lg:col-start-1
+          lg:row-start-2
+          lg:mb-0
+          lg:flex
+          lg:flex-col
+          lg:gap-3
+          lg:min-h-0
         "
       >
 
@@ -1464,6 +1596,7 @@ export default function Chat() {
             grid-cols-3
             gap-2
             sm:gap-3
+            lg:contents
           "
         >
 
@@ -1486,6 +1619,9 @@ export default function Chat() {
               transition
               sm:px-4
               sm:py-4
+              lg:order-1
+              lg:w-full
+              lg:mb-1
               ${
                 openPanel === 'add'
                   ? 'border-ink bg-ink text-paper'
@@ -1531,6 +1667,9 @@ export default function Chat() {
               transition
               sm:px-4
               sm:py-4
+              lg:order-3
+              lg:w-full
+              lg:mb-1
               ${
                 openPanel === 'requests'
                   ? 'border-ink bg-ink text-paper'
@@ -1604,6 +1743,9 @@ export default function Chat() {
               transition
               sm:px-4
               sm:py-4
+              lg:order-5
+              lg:w-full
+              lg:mb-1
               ${
                 openPanel === 'friends'
                   ? 'border-ink bg-ink text-paper'
@@ -1675,6 +1817,8 @@ export default function Chat() {
               bg-paper/70
               p-4
               sm:p-5
+              lg:order-2
+              lg:mt-0
             "
           >
 
@@ -1856,6 +2000,11 @@ export default function Chat() {
               bg-paper/70
               p-4
               sm:p-5
+              lg:order-4
+              lg:mt-0
+              lg:min-h-0
+              lg:max-h-[calc(100dvh-300px)]
+              lg:overflow-hidden
             "
           >
 
@@ -1897,6 +2046,9 @@ export default function Chat() {
                 grid
                 gap-3
                 sm:grid-cols-2
+                lg:max-h-[calc(100dvh-390px)]
+                lg:overflow-y-auto
+                lg:pr-1
               "
             >
 
@@ -2030,6 +2182,11 @@ export default function Chat() {
               bg-paper/70
               p-4
               sm:p-5
+              lg:order-6
+              lg:mt-0
+              lg:min-h-0
+              lg:max-h-[calc(100dvh-300px)]
+              lg:overflow-hidden
             "
           >
 
@@ -2071,7 +2228,10 @@ export default function Chat() {
                 grid
                 gap-2
                 sm:grid-cols-2
-                lg:grid-cols-3
+                lg:grid-cols-1
+                lg:max-h-[calc(100dvh-390px)]
+                lg:overflow-y-auto
+                lg:pr-1
               "
             >
 
@@ -2082,7 +2242,7 @@ export default function Chat() {
                     text-sm
                     text-ink-soft
                     sm:col-span-2
-                    lg:col-span-3
+                    lg:col-span-1
                   "
                 >
                   Add someone using their
@@ -2318,7 +2478,7 @@ export default function Chat() {
 
       {/* ===================================================
           CHAT WINDOW
-          
+
           ONLY APPEARS AFTER A FRIEND IS SELECTED
       =================================================== */}
 
@@ -2333,7 +2493,12 @@ export default function Chat() {
             border
             border-ink/15
             bg-paper/70
-            lg:min-h-[520px]
+            lg:col-start-2
+            lg:row-start-1
+            lg:row-span-2
+            lg:min-h-0
+            lg:mt-0
+            lg:h-[calc(100dvh-245px)]
           "
         >
 
@@ -2488,6 +2653,7 @@ export default function Chat() {
                           "
                         />
 
+
                         <span
                           className="
                             shrink-0
@@ -2501,6 +2667,7 @@ export default function Chat() {
                           {currentDate}
                         </span>
 
+
                         <div
                           className="
                             h-px
@@ -2512,6 +2679,7 @@ export default function Chat() {
                       </div>
 
                     )}
+
 
                     <div
                       className={`
@@ -2555,6 +2723,7 @@ export default function Chat() {
                         >
                           {message.content}
                         </p>
+
 
                         <p
                           className={`
@@ -2678,6 +2847,9 @@ export default function Chat() {
 
       )}
 
+      </div>
+
+
       {/* ===================================================
           FRIEND ACTION CONFIRMATION CARD
       =================================================== */}
@@ -2735,6 +2907,7 @@ export default function Chat() {
                 : 'Conversation management'}
             </p>
 
+
             <h2
               id="friend-action-title"
               className="
@@ -2749,6 +2922,7 @@ export default function Chat() {
                 : 'Delete this conversation?'}
             </h2>
 
+
             <p
               className="
                 mt-3
@@ -2762,6 +2936,7 @@ export default function Chat() {
                 ? `You will remove ${actionConfirmation.friend.pen_name?.trim() || actionConfirmation.friend.friend_id} from your friends. Your existing conversation will not be deleted.`
                 : `This will permanently delete the messages in your conversation with ${actionConfirmation.friend.pen_name?.trim() || actionConfirmation.friend.friend_id}. This action cannot be undone.`}
             </p>
+
 
             <div
               className="
@@ -2803,6 +2978,7 @@ export default function Chat() {
               >
                 Cancel
               </button>
+
 
               <button
                 type="button"
