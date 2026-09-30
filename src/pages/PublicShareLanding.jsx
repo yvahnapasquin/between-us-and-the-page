@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getPublicJournal } from '../services/journalService';
 import { recordPublicShareView } from '../services/shareService';
+import { supabase } from '../services/supabase';
 import { useAsync } from '../hooks/useAsync';
 import Loading from '../components/Loading';
 import Button from '../components/Button';
@@ -9,6 +10,8 @@ import Button from '../components/Button';
 export default function PublicShareLanding() {
   const { shareToken } = useParams();
   const navigate = useNavigate();
+
+  const [senderPenName, setSenderPenName] = useState('');
 
 
   useEffect(() => {
@@ -24,6 +27,73 @@ export default function PublicShareLanding() {
   }, [shareToken]);
 
 
+  /* =======================================================
+     LOAD SHARER'S PEN NAME
+     -------------------------------------------------------
+     Gets the pen name belonging to the owner of the
+     shared journal. This is separate from the journal's
+     author_name because the sender should be identified
+     using their account pen name.
+  ======================================================= */
+
+  useEffect(() => {
+
+    if (!shareToken) {
+      return;
+    }
+
+    let cancelled = false;
+
+
+    async function loadSenderPenName() {
+
+      const {
+        data,
+        error,
+      } = await supabase.rpc(
+        'get_public_journal_sender_pen_name',
+        {
+          p_share_token:
+            shareToken,
+        }
+      );
+
+
+      if (cancelled) {
+        return;
+      }
+
+
+      if (error) {
+
+        console.error(
+          'Failed to load shared-book sender pen name:',
+          error
+        );
+
+        return;
+      }
+
+
+      setSenderPenName(
+        typeof data === 'string'
+          ? data.trim()
+          : ''
+      );
+
+    }
+
+
+    loadSenderPenName();
+
+
+    return () => {
+      cancelled = true;
+    };
+
+  }, [shareToken]);
+
+
   const {
     data: journal,
     loading,
@@ -33,35 +103,60 @@ export default function PublicShareLanding() {
     [shareToken]
   );
 
+
   if (loading) {
     return <Loading label="Opening shared book" />;
   }
 
+
   if (error || !journal) {
+
     return (
       <section className="min-h-[calc(100vh-80px)] flex items-center justify-center px-4 py-12">
+
         <div className="page-card w-full max-w-lg bg-paper p-8 text-center">
+
           <h1 className="mb-3 font-display text-2xl">
             This shared book is unavailable
           </h1>
+
 
           <p className="mb-6 text-sm text-ink-soft">
             The link may be invalid or the book may no longer be available.
           </p>
 
+
           <Button onClick={() => navigate('/')}>
             Go home
           </Button>
+
         </div>
+
       </section>
     );
+
   }
 
-  const authorName = journal.author_name?.trim() || 'Someone';
+
+  /*
+    The shared-book sender should use the account's pen name.
+
+    The journal author name is kept as a fallback so existing
+    shared links still display a name if the account does not
+    have a pen name saved.
+  */
+
+  const senderName =
+    senderPenName ||
+    journal.author_name?.trim() ||
+    'Someone';
+
 
   return (
     <section className="min-h-[calc(100vh-80px)] flex items-center justify-center px-4 py-12">
+
       <div className="page-card w-full max-w-xl bg-paper p-8 text-center sm:p-12">
+
 
         {/* =================================================
             SHARED BOOK ICON
@@ -100,6 +195,7 @@ export default function PublicShareLanding() {
                 strokeLinejoin="round"
               />
 
+
               {/* Right page */}
 
               <path
@@ -110,6 +206,7 @@ export default function PublicShareLanding() {
                 strokeLinejoin="round"
               />
 
+
               {/* Center spine */}
 
               <path
@@ -118,6 +215,7 @@ export default function PublicShareLanding() {
                 strokeWidth="2.2"
                 strokeLinecap="round"
               />
+
 
               {/* Page lines */}
 
@@ -129,6 +227,7 @@ export default function PublicShareLanding() {
                 opacity="0.55"
               />
 
+
               <path
                 d="M15.5 27C20 26.5 24.5 27.5 28 29.5"
                 stroke="currentColor"
@@ -137,6 +236,7 @@ export default function PublicShareLanding() {
                 opacity="0.55"
               />
 
+
               <path
                 d="M48.5 21C44 20.5 39.5 21.5 36 23.5"
                 stroke="currentColor"
@@ -144,6 +244,7 @@ export default function PublicShareLanding() {
                 strokeLinecap="round"
                 opacity="0.55"
               />
+
 
               <path
                 d="M48.5 27C44 26.5 39.5 27.5 36 29.5"
@@ -164,9 +265,11 @@ export default function PublicShareLanding() {
           A book was shared with you
         </p>
 
+
         <h1 className="mb-8 font-display text-3xl leading-tight sm:text-4xl">
-          {authorName} shared a book with you
+          {senderName} shared a book with you
         </h1>
+
 
         <Button
           onClick={() => navigate(`/shared/${shareToken}/book`)}
@@ -174,7 +277,9 @@ export default function PublicShareLanding() {
           Open the book →
         </Button>
 
+
       </div>
+
     </section>
   );
 }
