@@ -655,18 +655,48 @@ export default function Journal() {
      BOOK LOCATION
   ======================================================= */
 
+  const locationStorageKey = `between-us-journal-location-${isPublicView ? `shared-${shareToken}` : `journal-${journalId}`}`;
+
   const [
     currentLocation,
     setCurrentLocation,
-  ] = useState(1);
+  ] = useState(() => {
+    try {
+      const savedLocation = Number(
+        localStorage.getItem(locationStorageKey)
+      );
+      return Number.isInteger(savedLocation) && savedLocation >= 1
+        ? savedLocation
+        : 1;
+    } catch (error) {
+      console.error('Unable to restore journal page location:', error);
+      return 1;
+    }
+  });
 
 
   const [
     flippedPapers,
     setFlippedPapers,
-  ] = useState(
-    () => new Set()
-  );
+  ] = useState(() => {
+    try {
+      const savedLocation = Number(
+        localStorage.getItem(locationStorageKey)
+      );
+      if (!Number.isInteger(savedLocation) || savedLocation <= 1) {
+        return new Set();
+      }
+      return new Set(
+        Array.from(
+          { length: savedLocation - 1 },
+          (_, index) => index + 1
+        )
+      );
+    } catch (error) {
+      console.error('Unable to restore journal page turns:', error);
+      return new Set();
+    }
+  });
 
 
   const [
@@ -1029,6 +1059,24 @@ export default function Journal() {
 
   locationRef.current =
     currentLocation;
+
+
+  /* =======================================================
+     PERSIST CURRENT BOOK LOCATION
+  ======================================================= */
+
+  useEffect(() => {
+    if (!journalId && !shareToken) return;
+
+    try {
+      localStorage.setItem(
+        locationStorageKey,
+        String(currentLocation)
+      );
+    } catch (error) {
+      console.error('Unable to save journal page location:', error);
+    }
+  }, [currentLocation, locationStorageKey, journalId, shareToken]);
 
 
   /* =======================================================

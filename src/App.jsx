@@ -144,7 +144,7 @@ export default function App() {
               path="/journal/:journalId"
               element={
                 <ProtectedRoute>
-                  <Journal />
+                  <Journal key={window.location.hash} />
                 </ProtectedRoute>
               }
             />
@@ -195,7 +195,7 @@ export default function App() {
             <Route
               path="/shared/:shareToken/book"
               element={
-                <Journal />
+                <Journal key={window.location.hash} />
               }
             />
 
