@@ -397,6 +397,57 @@ export default function Chat() {
 
 
   /* =======================================================
+     RESTORE SELECTED CONVERSATION AFTER REFRESH
+  ======================================================= */
+
+  useEffect(() => {
+    if (!user?.id || !friends.length) return;
+
+    const storageKey = `between-us-chat-selected-${user.id}`;
+    let savedFriendId = null;
+
+    try {
+      savedFriendId = window.localStorage.getItem(storageKey);
+    } catch (storageError) {
+      console.warn('Could not read saved chat selection.', storageError);
+    }
+
+    if (!savedFriendId) return;
+
+    const savedFriend = friends.find(
+      (friend) => String(friend.id) === String(savedFriendId)
+    );
+
+    if (savedFriend) {
+      setSelectedFriend((current) => current || savedFriend);
+    } else {
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch (storageError) {
+        console.warn('Could not clear unavailable chat selection.', storageError);
+      }
+    }
+  }, [user?.id, friends]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const storageKey = `between-us-chat-selected-${user.id}`;
+
+    // Do not clear the saved selection while friends are still loading.
+    // On refresh, selectedFriend starts as null; removing the key here
+    // would erase the value before the restore effect can use it.
+    if (!selectedFriend?.id) return;
+
+    try {
+      window.localStorage.setItem(storageKey, String(selectedFriend.id));
+    } catch (storageError) {
+      console.warn('Could not save chat selection.', storageError);
+    }
+  }, [user?.id, selectedFriend]);
+
+
+  /* =======================================================
      LOAD MESSAGES WHEN A FRIEND IS SELECTED
   ======================================================= */
 
@@ -851,6 +902,13 @@ export default function Chat() {
       ) {
         setSelectedFriend(null);
         setMessages([]);
+        try {
+          window.localStorage.removeItem(
+            `between-us-chat-selected-${user.id}`
+          );
+        } catch (storageError) {
+          console.warn('Could not clear removed chat selection.', storageError);
+        }
       }
 
       setNotice(
