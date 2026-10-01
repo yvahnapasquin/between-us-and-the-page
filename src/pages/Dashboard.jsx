@@ -621,6 +621,54 @@ export default function Dashboard() {
     setAdminLibraryView,
   ] = useState('library');
 
+  // Restore non-sensitive dashboard preferences after a browser refresh.
+  // Temporary UI state (dialogs, selection, and unsaved forms) is not stored.
+  const [dashboardPreferencesLoaded, setDashboardPreferencesLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setDashboardPreferencesLoaded(false);
+      return;
+    }
+
+    const storageKey = `between-us-dashboard-preferences-${user.id}`;
+
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+
+      if (saved.sharedView === 'editor' || saved.sharedView === 'viewer') {
+        setSharedView(saved.sharedView);
+      }
+      if (['recent', 'az', 'za', 'oldest', 'newest'].includes(saved.journalSort)) {
+        setJournalSort(saved.journalSort);
+      }
+      if (isAdmin && ['library', 'featured'].includes(saved.adminLibraryView)) {
+        setAdminLibraryView(saved.adminLibraryView);
+      } else {
+        setAdminLibraryView('library');
+      }
+    } catch (error) {
+      console.warn('Could not restore dashboard preferences:', error);
+    }
+
+    setDashboardPreferencesLoaded(true);
+  }, [user?.id, isAdmin]);
+
+  useEffect(() => {
+    if (!user?.id || !dashboardPreferencesLoaded) return;
+
+    const storageKey = `between-us-dashboard-preferences-${user.id}`;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({
+        sharedView,
+        journalSort,
+        adminLibraryView: isAdmin ? adminLibraryView : 'library',
+      }));
+    } catch (error) {
+      console.warn('Could not save dashboard preferences:', error);
+    }
+  }, [user?.id, isAdmin, dashboardPreferencesLoaded, sharedView, journalSort, adminLibraryView]);
+
 
   const [
     title,
