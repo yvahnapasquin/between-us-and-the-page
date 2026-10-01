@@ -10,13 +10,14 @@ import {
 
 import {
   getChatNotifications,
+  getUnreadMessageCounts,
+  markChatAsRead,
   getFriendRequests,
   getFriends,
   getMessages,
   getMyProfile,
   deleteConversation,
   unfriendFriend,
-  markAllChatsRead,
   searchUserByFriendId,
   sendFriendRequest,
   sendMessage,
@@ -41,6 +42,11 @@ export default function Chat() {
     friends,
     setFriends,
   ] = useState([]);
+
+  const [
+    unreadCounts,
+    setUnreadCounts,
+  ] = useState({});
 
 
   const [
@@ -328,35 +334,10 @@ export default function Chat() {
       );
 
 
-      const notificationFriendIds = [
-
-        ...new Set(
-
-          myNotifications
-            .filter(
-              (notification) =>
-                notification.type ===
-                'message'
-            )
-            .map(
-              (notification) =>
-                notification.friendId
-            )
-
-        ),
-
-      ];
-
-
-      if (
-        notificationFriendIds.length
-      ) {
-
-        await markAllChatsRead(
-          notificationFriendIds
-        );
-
-      }
+      const counts = await getUnreadMessageCounts(
+        myFriends.map((friend) => friend.id)
+      );
+      setUnreadCounts(counts);
 
     } catch (err) {
 
@@ -445,6 +426,41 @@ export default function Chat() {
       console.warn('Could not save chat selection.', storageError);
     }
   }, [user?.id, selectedFriend]);
+
+
+  /* =======================================================
+     REFRESH UNREAD COUNTS WITHOUT RELOADING THE PAGE
+  ======================================================= */
+
+  useEffect(() => {
+    if (!user?.id || !friends.length) {
+      setUnreadCounts({});
+      return undefined;
+    }
+
+    let cancelled = false;
+    const refreshUnreadCounts = async () => {
+      try {
+        const [counts, latestNotifications] = await Promise.all([
+          getUnreadMessageCounts(friends.map((friend) => friend.id)),
+          getChatNotifications(),
+        ]);
+        if (!cancelled) {
+          setUnreadCounts(counts);
+          setNotifications(latestNotifications);
+        }
+      } catch (err) {
+        console.error('Could not refresh unread message counts:', err);
+      }
+    };
+
+    refreshUnreadCounts();
+    const interval = window.setInterval(refreshUnreadCounts, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [user?.id, friends]);
 
 
   /* =======================================================
@@ -1023,14 +1039,17 @@ export default function Chat() {
      SELECT FRIEND
   ======================================================= */
 
-  function handleSelectFriend(
+  async function handleSelectFriend(
     friend
   ) {
+    setSelectedFriend(friend);
+    setUnreadCounts((current) => ({ ...current, [friend.id]: 0 }));
 
-    setSelectedFriend(
-      friend
-    );
-
+    try {
+      await markChatAsRead(friend.id);
+    } catch (err) {
+      console.error('Could not mark conversation as read:', err);
+    }
   }
 
 
@@ -1318,10 +1337,7 @@ export default function Chat() {
 
                           if (friend) {
 
-                            setSelectedFriend(
-                              friend
-                            );
-
+                            handleSelectFriend(friend);
 
                             setOpenPanel(
                               'friends'
@@ -1402,24 +1418,11 @@ export default function Chat() {
                           </p>
 
 
-                          {notification.type ===
-                            'message' &&
-                            notification.preview && (
-
-                              <p
-                                className="
-                                  mt-1
-                                  truncate
-                                  text-xs
-                                  text-ink-soft
-                                "
-                              >
-                                {
-                                  notification.preview
-                                }
-                              </p>
-
-                            )}
+                          {notification.type === 'message' && (
+                            <p className="mt-1 text-xs text-ink-soft">
+                              {notification.unreadCount} unread message{notification.unreadCount === 1 ? '' : 's'}
+                            </p>
+                          )}
 
                         </div>
 
@@ -2388,7 +2391,20 @@ export default function Chat() {
                             text-sm
                           "
                         >
-                          {friend.pen_name?.trim() || friend.friend_id}
+                          <span className="inline-flex items-center gap-2">
+                            <span>{friend.pen_name?.trim() || friend.friend_id}</span>
+                            {(unreadCounts[friend.id] || 0) > 0 && (
+                              <span
+                                className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 font-sans text-[10px] font-semibold leading-none ${
+                                  isSelected ? 'bg-paper text-ink' : 'bg-ink text-paper'
+                                }`}
+                                aria-label={`${unreadCounts[friend.id] >= 9 ? '9+' : unreadCounts[friend.id]} unread messages`}
+                                title={`${unreadCounts[friend.id]} unread messages`}
+                              >
+                                {unreadCounts[friend.id] >= 9 ? '9+' : unreadCounts[friend.id]}
+                              </span>
+                            )}
+                          </span>
                         </p>
 
                         <p
@@ -2405,7 +2421,7 @@ export default function Chat() {
                             }
                           `}
                         >
-                          {friend.friend_id}
+                          <span>{friend.friend_id}</span>
                         </p>
 
                       </button>

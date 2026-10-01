@@ -1,4 +1,3 @@
-
 import { supabase } from './supabase';
 
 
@@ -258,11 +257,6 @@ export async function updateFriendRequest(
 
 /* =========================================================
    GET FRIENDS
-   ---------------------------------------------------------
-   Sorts friends by latest conversation activity.
-   Friends with no messages are sorted by friendship
-   creation date, so newly accepted friends appear
-   near the top.
 ========================================================= */
 
 export async function getFriends() {
@@ -296,7 +290,6 @@ export async function getFriends() {
   }
 
   const friendships = data || [];
-
   const friendIds = [
     ...new Set(
       friendships.map((request) =>
@@ -344,8 +337,8 @@ export async function getFriends() {
     ])
   );
 
-  // Messages are ordered newest-first, so the first
-  // message encountered for each friend is the latest.
+  // The query is newest-first, so the first message for each
+  // friend is the most recent activity in that conversation.
   const latestMessageByFriend = new Map();
 
   for (const message of messagesResult.data || []) {
@@ -391,7 +384,6 @@ export async function getFriends() {
         new Date(a.last_message_at || 0).getTime(),
         new Date(a.friendship_created_at).getTime()
       );
-
       const bActivity = Math.max(
         new Date(b.last_message_at || 0).getTime(),
         new Date(b.friendship_created_at).getTime()
@@ -400,8 +392,6 @@ export async function getFriends() {
       return bActivity - aActivity;
     });
 }
-
-
 /* =========================================================
    GET MESSAGES
 ========================================================= */
@@ -699,28 +689,27 @@ export async function getChatNotifications() {
       })
     ),
 
-    ...unreadMessages.map(
-      (message) => ({
-        id:
-          `message-${message.id}`,
+    ...[...new Set(unreadMessages.map((message) => message.sender_id))].map(
+      (senderId) => {
+        const senderMessages = unreadMessages.filter(
+          (message) => message.sender_id === senderId
+        );
+        const latestMessage = senderMessages.reduce(
+          (latest, message) =>
+            new Date(message.created_at).getTime() > new Date(latest.created_at).getTime()
+              ? message
+              : latest
+        );
 
-        type:
-          'message',
-
-        created_at:
-          message.created_at,
-
-        profile:
-          profileMap.get(
-            message.sender_id
-          ) || null,
-
-        messageId:
-          message.id,
-
-        message:
-          message.content,
-      })
+        return {
+          id: `message-${senderId}`,
+          type: 'message',
+          friendId: senderId,
+          unreadCount: senderMessages.length,
+          created_at: latestMessage.created_at,
+          profile: profileMap.get(senderId) || null,
+        };
+      }
     ),
   ];
 
@@ -784,6 +773,41 @@ export async function markChatAsRead(
   }
 
   return data;
+}
+
+
+/* =========================================================
+   GET UNREAD MESSAGE COUNTS BY FRIEND
+========================================================= */
+
+export async function getUnreadMessageCounts(friendIds = []) {
+  const user = await getCurrentUser();
+  const uniqueFriendIds = [...new Set(friendIds.filter(Boolean))];
+
+  if (!uniqueFriendIds.length) return {};
+
+  const { data: messages, error: messagesError } = await supabase
+    .from('messages')
+    .select('sender_id, created_at')
+    .eq('receiver_id', user.id)
+    .in('sender_id', uniqueFriendIds);
+
+  if (messagesError) throw messagesError;
+
+  const readStates = await getChatReadStates(user.id, uniqueFriendIds);
+  const readMap = new Map(
+    readStates.map((state) => [state.friend_id, state.last_read_at])
+  );
+  const counts = Object.fromEntries(uniqueFriendIds.map((friendId) => [friendId, 0]));
+
+  for (const message of messages || []) {
+    const lastReadAt = readMap.get(message.sender_id);
+    if (!lastReadAt || new Date(message.created_at).getTime() > new Date(lastReadAt).getTime()) {
+      counts[message.sender_id] = (counts[message.sender_id] || 0) + 1;
+    }
+  }
+
+  return counts;
 }
 
 
