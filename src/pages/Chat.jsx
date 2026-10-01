@@ -748,6 +748,25 @@ export default function Chat() {
           ]
         );
 
+        // Immediately move the active conversation to the top.
+        // This is optimistic UI; no refresh or database reload needed.
+        setFriends((current) => {
+          const activeFriend = current.find(
+            (friend) => friend.id === selectedFriend.id
+          );
+
+          if (!activeFriend) {
+            return current;
+          }
+
+          return [
+            { ...activeFriend, last_message_at: message.created_at },
+            ...current.filter(
+              (friend) => friend.id !== selectedFriend.id
+            ),
+          ];
+        });
+
       }
 
 

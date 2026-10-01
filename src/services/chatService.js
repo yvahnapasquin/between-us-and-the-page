@@ -1,3 +1,4 @@
+
 import { supabase } from './supabase';
 
 
@@ -257,6 +258,11 @@ export async function updateFriendRequest(
 
 /* =========================================================
    GET FRIENDS
+   ---------------------------------------------------------
+   Sorts friends by latest conversation activity.
+   Friends with no messages are sorted by friendship
+   creation date, so newly accepted friends appear
+   near the top.
 ========================================================= */
 
 export async function getFriends() {
@@ -289,62 +295,110 @@ export async function getFriends() {
     throw error;
   }
 
-  const friendIds =
-    (data || []).map(
-      (request) =>
+  const friendships = data || [];
+
+  const friendIds = [
+    ...new Set(
+      friendships.map((request) =>
         request.requester_id === user.id
           ? request.recipient_id
           : request.requester_id
-    );
+      )
+    ),
+  ];
 
   if (!friendIds.length) {
     return [];
   }
 
-  const {
-    data: profiles,
-    error: profileError,
-  } = await supabase
-    .from('chat_profiles')
-    .select(
-      'id, friend_id, pen_name'
-    )
-    .in(
-      'id',
-      friendIds
-    );
+  const [
+    profilesResult,
+    messagesResult,
+  ] = await Promise.all([
+    supabase
+      .from('chat_profiles')
+      .select('id, friend_id, pen_name')
+      .in('id', friendIds),
 
-  if (profileError) {
-    throw profileError;
+    supabase
+      .from('messages')
+      .select('sender_id, receiver_id, created_at')
+      .or(
+        `sender_id.eq.${user.id},receiver_id.eq.${user.id}`
+      )
+      .order('created_at', { ascending: false }),
+  ]);
+
+  if (profilesResult.error) {
+    throw profilesResult.error;
   }
 
-  const profileMap =
-    new Map(
-      (profiles || []).map(
-        (profile) => [
-          profile.id,
-          profile,
-        ]
-      )
-    );
+  if (messagesResult.error) {
+    throw messagesResult.error;
+  }
 
-  return (data || [])
-    .map(
-      (request) => {
+  const profileMap = new Map(
+    (profilesResult.data || []).map((profile) => [
+      profile.id,
+      profile,
+    ])
+  );
 
-        const friendId =
-          request.requester_id === user.id
-            ? request.recipient_id
-            : request.requester_id;
+  // Messages are ordered newest-first, so the first
+  // message encountered for each friend is the latest.
+  const latestMessageByFriend = new Map();
 
-        return (
-          profileMap.get(
-            friendId
-          ) || null
-        );
+  for (const message of messagesResult.data || []) {
+    const friendId =
+      message.sender_id === user.id
+        ? message.receiver_id
+        : message.sender_id;
+
+    if (
+      friendIds.includes(friendId) &&
+      !latestMessageByFriend.has(friendId)
+    ) {
+      latestMessageByFriend.set(
+        friendId,
+        message.created_at
+      );
+    }
+  }
+
+  return friendships
+    .map((request) => {
+      const friendId =
+        request.requester_id === user.id
+          ? request.recipient_id
+          : request.requester_id;
+
+      const profile = profileMap.get(friendId);
+
+      if (!profile) {
+        return null;
       }
-    )
-    .filter(Boolean);
+
+      return {
+        ...profile,
+        friendship_created_at: request.created_at,
+        last_message_at:
+          latestMessageByFriend.get(friendId) || null,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const aActivity = Math.max(
+        new Date(a.last_message_at || 0).getTime(),
+        new Date(a.friendship_created_at).getTime()
+      );
+
+      const bActivity = Math.max(
+        new Date(b.last_message_at || 0).getTime(),
+        new Date(b.friendship_created_at).getTime()
+      );
+
+      return bActivity - aActivity;
+    });
 }
 
 
